@@ -1,6 +1,6 @@
 from typing import Type
 import SimpleITK as sitk
-from constants import *
+from src.utils.constants import *
 import numpy as np
 
 
