@@ -20,7 +20,8 @@ class Preprocessing:
               default=True, is_flag=True)
 @click.option('--dataset_id', '-d', help='The dataset id to work on.', type=str)
 def main(folds: int, processes: int, normalize: bool, dataset_id: str):
-    # Do stuff
+    # This method should now create a Preprocessing object, which should have a bunch of static methods.
+    # This method will now sequentially run these commands based on arguments.
     pass
 
 
