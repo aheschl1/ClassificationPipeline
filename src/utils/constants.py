@@ -1,0 +1,1 @@
+SIMPLE_ITK = 'SimpleITK'
