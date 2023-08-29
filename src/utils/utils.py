@@ -192,6 +192,8 @@ def batch_collate_fn(batch: List[Datapoint]) -> Tuple[torch.Tensor, torch.Tensor
     for point in batch:
         data.append(point.data)
         labels.append(torch.tensor(point.label))
+        point.clear_data()
+
     return torch.stack(data), torch.stack(labels), batch
 
 

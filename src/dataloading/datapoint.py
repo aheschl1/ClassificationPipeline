@@ -20,6 +20,10 @@ class Datapoint:
     def load_data(self, **kwargs) -> np.array:
         self.data = self.reader_writer.read(self.path, **kwargs)
 
+    def clear_data(self):
+        del self.data
+        self.data = None
+
     @property
     def case_name(self) -> str:
         if self._case_name is not None:
