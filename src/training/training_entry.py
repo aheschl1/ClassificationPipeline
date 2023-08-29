@@ -1,4 +1,5 @@
 import os.path
+import time
 from typing import Tuple, Type
 import torch.nn as nn
 import torch
@@ -80,7 +81,7 @@ class Trainer:
             running_loss += loss.item()
             total_items += batch_size
 
-        return running_loss/total_items
+        return running_loss / total_items
 
     def _eval_single_epoch(self) -> Tuple[float, float]:
         def count_correct(a: torch.Tensor, b: torch.Tensor) -> int:
@@ -109,21 +110,44 @@ class Trainer:
             correct_count += count_correct(predictions, labels)
             total_items += batch_size
 
-        return running_loss/total_items, correct_count/total_items
+        return running_loss / total_items, correct_count / total_items
 
     def train(self) -> None:
         epochs = self.config['epochs']
+        start_time = time.time()
+        best_val_loss = 9090909.  # Arbitrary large number
+
         for epoch in range(epochs):
             log(self.seperator)
-            log(f"Epoch {epoch+1}/{epochs} starting.")
+            log(f"Epoch {epoch + 1}/{epochs} starting.")
             self.model.train()
             mean_train_loss = self._train_single_epoch()
             self.model.eval()
             with torch.no_grad():
                 mean_val_loss, val_accuracy = self._eval_single_epoch()
+            self.save_model_weights('latest')  # saving model every epoch
             log(f"Train loss: {mean_train_loss}")
             log(f"Val loss: {mean_val_loss}")
             log(f"Val accuracy: {val_accuracy}")
+            # If best model, save!
+            if mean_val_loss < best_val_loss:
+                log('Nice, that\'s a new best loss. Saving the weights!')
+                best_val_loss = mean_val_loss
+                self.save_model_weights('best')
+
+        # Now training is completed, print some stuff
+        self.save_model_weights('final')  # save the final weights
+        end_time = time.time()
+        seconds_taken = end_time - start_time
+        log(f"Finished training {epochs} epochs.")
+        log(f"{seconds_taken} seconds")
+        log(f"{seconds_taken / 60} minutes")
+        log(f"{(seconds_taken / 3600)} hours")
+        log(f"{(seconds_taken / 86400)} days")
+
+    def save_model_weights(self, save_name: str) -> None:
+        path = f"{self.output_dir}/{save_name}.pth"
+        torch.save(self.model.state_dict(), path)
 
     def _get_optim(self) -> torch.optim:
         return SGD(
@@ -132,10 +156,13 @@ class Trainer:
         )
 
     def _get_model(self) -> nn.Module:
-        return nn.Identity().to(self.device)
+        model = nn.Identity().to(self.device)
+        log(str(model))
+        return model
 
     @staticmethod
     def _get_loss() -> nn.Module:
+        log("Loss is nn.CrossEntropyLoss()")
         return nn.CrossEntropyLoss()
 
 
