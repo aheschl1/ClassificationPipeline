@@ -1,7 +1,9 @@
-from torch.utils.data import Dataset
-from typing import List, Callable, Tuple
-from src.dataloading.datapoint import Datapoint
+from typing import List, Callable
+
 import torch
+from torch.utils.data import Dataset
+
+from src.dataloading.datapoint import Datapoint
 
 
 class PipelineDataset(Dataset):

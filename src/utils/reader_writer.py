@@ -1,11 +1,11 @@
-import os
+import pickle
 from typing import Type, Union
+
 import SimpleITK as sitk
+import numpy as np
 import torch
 
 from src.utils.constants import *
-import numpy as np
-import pickle
 
 
 class BaseReaderWriter:

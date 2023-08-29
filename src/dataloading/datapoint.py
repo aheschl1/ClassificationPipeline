@@ -30,5 +30,3 @@ class Datapoint:
     @property
     def extension(self) -> str:
         return '.'.join(self.path.split('.')[1:])
-
-
