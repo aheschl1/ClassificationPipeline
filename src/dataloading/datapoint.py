@@ -27,4 +27,8 @@ class Datapoint:
         raise NameError('You are trying to access case name when you never set it. set case_name when constructing '
                         'object.')
 
+    @property
+    def extension(self) -> str:
+        return '.'.join(self.path.split('.')[1:])
+
 

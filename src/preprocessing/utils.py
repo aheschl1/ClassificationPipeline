@@ -39,7 +39,7 @@ def calculate_mean_std(dataloader: DataLoader) -> Tuple[float, float]:
     pixel_count = 0
 
     # loop through images
-    for data, _ in tqdm(dataloader, desc="Calculating mean and std"):
+    for data, _, _ in tqdm(dataloader, desc="Calculating mean and std"):
         assert data.shape[0] == 1, "Expected batch size 1 for mean std calculations. Womp womp"
         psum += data.sum()
         psum_sq += (data ** 2).sum()

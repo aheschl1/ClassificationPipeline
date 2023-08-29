@@ -16,11 +16,11 @@ class PipelineDataset(Dataset):
     def __len__(self):
         return len(self.datapoints)
 
-    def __getitem__(self, idx) -> Tuple[torch.tensor, int]:
+    def __getitem__(self, idx) -> Datapoint:
         point = self.datapoints[idx]
-        data = point.get_data(store_metadata=self.store_metadata)
+        point.load_data(store_metadata=self.store_metadata)
         if self.transforms is not None:
-            data = self.transforms(data)
-        if not isinstance(data, torch.Tensor):
-            data = torch.tensor(data)
-        return data, point.label
+            point.data = self.transforms(point.data)
+        if not isinstance(point.data, torch.Tensor):
+            point.data = torch.tensor(point.data)
+        return point

@@ -1,6 +1,9 @@
 import json
 from typing import Dict, Type, List, Union, Tuple
 import os
+
+import torch
+
 from src.utils.constants import DATA_ROOT, PREPROCESSED_ROOT, RAW_ROOT
 from torch.utils.data import DataLoader
 import glob
@@ -128,11 +131,21 @@ def get_config_from_dataset(dataset_name: str) -> Dict:
     return read_json(path)
 
 
+def batch_collate_fn(batch: List[Datapoint]) -> Tuple[torch.Tensor, torch.Tensor, List[Datapoint]]:
+    data = []
+    labels = []
+    for point in batch:
+        data.append(point.data)
+        labels.append(torch.tensor(point.label))
+    return torch.stack(data), torch.stack(labels), batch
+
+
 def get_dataloaders_from_fold(dataset_name: str, fold: int,
                               train_transforms=None, val_transforms=None,
                               preprocessed_data: bool = True,
                               store_metadata: bool = False,
                               **kwargs) -> Tuple[DataLoader, DataLoader]:
+
     config = get_config_from_dataset(dataset_name)
 
     train_points, val_points = get_preprocessed_datapoints(dataset_name, get_label_mapping_from_dataset(dataset_name),
@@ -147,7 +160,8 @@ def get_dataloaders_from_fold(dataset_name: str, fold: int,
         batch_size=kwargs.get('batch_size', config['batch_size']),
         num_workers=kwargs.get('processes', config['processes']),
         shuffle=kwargs.get('shuffle', True),
-        pin_memory=True
+        pin_memory=True,
+        collate_fn=batch_collate_fn
     )
 
     val_dataloader = DataLoader(
@@ -155,7 +169,8 @@ def get_dataloaders_from_fold(dataset_name: str, fold: int,
         batch_size=kwargs.get('batch_size', config['batch_size']),
         num_workers=kwargs.get('processes', config['processes']),
         shuffle=False,
-        pin_memory=True
+        pin_memory=True,
+        collate_fn=batch_collate_fn
     )
 
     return train_dataloader, val_dataloader

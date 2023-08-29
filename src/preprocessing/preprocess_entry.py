@@ -11,7 +11,7 @@ from typing import Dict, List, Union, Tuple
 from tqdm import tqdm
 import torch
 from torchvision.transforms import Normalize
-
+import time
 
 def build_config(dataset_name: str, processes: int) -> None:
     """
@@ -71,6 +71,7 @@ def get_case_to_label_mapping(datapoints: List[Datapoint]) -> Dict[str, int]:
 
 def process_fold(dataset_name: str, fold: int):
     print(f"Now starting with fold {fold}...")
+    time.sleep(1)
     train_loader, val_loader = get_dataloaders_from_fold(dataset_name, fold,
                                                          preprocessed_data=False,
                                                          batch_size=1,
@@ -83,14 +84,15 @@ def process_fold(dataset_name: str, fold: int):
     os.mkdir(f"{PREPROCESSED_ROOT}/{dataset_name}/fold_{fold}/val")
     # start saving preprocessed stuff
     mean, std = calculate_mean_std(train_loader)
-    # TODO figure this shit out
-    for i, (data, _) in tqdm(enumerate(train_loader), desc="Preprocessing train set"):
-        writer = train_loader.dataset.datapoints[i].reader_writer
-        print(writer)
-        writer.write(
-            Normalize(mean=mean, std=std)(data.float().squeeze()),
-            '/home/andrewheschl/Documents/Datasets/CardiacPipeline/preprocessed/a.nii.gz'
-        )
+    for _set in ['train', 'val']:
+        for data, labels, points in \
+                tqdm(train_loader if _set == 'train' else val_loader, desc=f"Preprocessing {_set} set"):
+            point = points[0]
+            writer = point.reader_writer
+            writer.write(
+                Normalize(mean=mean, std=std)(data[0].float().squeeze()),
+                f"{PREPROCESSED_ROOT}/{dataset_name}/fold_{fold}/{_set}/{point.case_name}.{point.extension}"
+            )
 
 
 @click.command()
