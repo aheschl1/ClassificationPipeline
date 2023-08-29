@@ -1,17 +1,26 @@
 import numpy as np
 from src.utils.constants import *
-from src.utils.readers import get_reader
+from src.utils.reader_writer import get_reader, get_writer
 
 
 class Datapoint:
-    def __init__(self, path: str, label: int, reader: str = SIMPLE_ITK, case_name: str = None) -> None:
+    def __init__(self, path: str, label: int,
+                 case_name: str = None,
+                 reader: str = SIMPLE_ITK,
+                 writer: str = SIMPLE_ITK) -> None:
+
         self.path = path
         self.label = label
         self._reader = get_reader(reader)()
+        self.writer = get_writer(writer)()
         self._case_name = case_name
+        self.data = None
 
     def get_data(self) -> np.array:
         return self._reader.read(self.path)
+
+    def load_data(self) -> np.array:
+        self.data = self._reader.read(self.path)
 
     @property
     def case_name(self) -> str:
