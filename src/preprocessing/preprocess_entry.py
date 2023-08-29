@@ -105,11 +105,10 @@ def process_fold(dataset_name: str, fold: int, normalize: bool) -> None:
 
 
 @click.command()
-@click.option('--folds', '-f', help='How many folds should be generated.', type=int)
-@click.option('--processes', '-p', help='How many processes can be used.', type=int, default=8)
-@click.option('--normalize', '--n', help='Should we compute and save normalized data.', type=bool,
-              default=True, is_flag=True)
-@click.option('--dataset_id', '-d', help='The dataset id to work on.', type=str)
+@click.option('-folds', '-f', help='How many folds should be generated.', type=int)
+@click.option('-processes', '-p', help='How many processes can be used.', type=int, default=8)
+@click.option('--normalize', '--n', help='Should we compute and save normalized data.', type=bool, is_flag=True)
+@click.option('-dataset_id', '-d', help='The dataset id to work on.', type=str)
 def main(folds: int, processes: int, normalize: bool, dataset_id: str):
     """
     :param folds: How many folds to generate.

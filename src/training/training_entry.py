@@ -1,24 +1,26 @@
+import logging
 import os.path
 import time
-from typing import Tuple, Type
-import torch.nn as nn
+import uuid
+from typing import Tuple
+
+import click
+import multiprocessing_logging  # for multiprocess logging https://github.com/jruere/multiprocessing-logging
 import torch
-import numpy as np
+import torch.nn as nn
+from torch.optim import SGD
 from torch.utils.data import DataLoader
 
 from src.utils.constants import *
 from src.utils.utils import get_dataset_name_from_id, read_json, get_dataloaders_from_fold, get_config_from_dataset
-import click
-import multiprocessing_logging  # for multiprocess logging https://github.com/jruere/multiprocessing-logging
-import logging
-import uuid
-from torch.optim import SGD
+from src.json_models.src.model_generator import ModelGenerator
 
 
 class Trainer:
-    def __init__(self, dataset_name: str, fold: int):
+    def __init__(self, dataset_name: str, fold: int, save_latest: bool, model_path: str):
         self.dataset_name = dataset_name
         self.fold = fold
+        self.save_latest = save_latest
         self.output_dir = self._prepare_output_directory()
         self._assert_preprocess_ready_for_train()
         self.config = get_config_from_dataset(dataset_name)
@@ -28,7 +30,7 @@ class Trainer:
         self.seperator = "======================================================================="
         # Start on important stuff here
         self.train_dataloader, self.val_dataloader = self._get_dataloaders()
-        self.model = self._get_model()
+        self.model = self._get_model(model_path)
         self.loss = Trainer._get_loss()
         self.optim = self._get_optim()
 
@@ -125,7 +127,8 @@ class Trainer:
             self.model.eval()
             with torch.no_grad():
                 mean_val_loss, val_accuracy = self._eval_single_epoch()
-            self.save_model_weights('latest')  # saving model every epoch
+            if self.save_latest:
+                self.save_model_weights('latest')  # saving model every epoch
             log(f"Train loss: {mean_train_loss}")
             log(f"Val loss: {mean_val_loss}")
             log(f"Val accuracy: {val_accuracy}")
@@ -155,9 +158,10 @@ class Trainer:
             lr=self.config['lr']
         )
 
-    def _get_model(self) -> nn.Module:
-        model = nn.Identity().to(self.device)
-        log(str(model))
+    def _get_model(self, path: str) -> nn.Module:
+        gen = ModelGenerator(json_path=path)
+        model = gen.get_model().to(self.device)
+        log(gen.get_log_kwargs())
         return model
 
     @staticmethod
@@ -172,12 +176,15 @@ def log(*messages):
 
 
 @click.command()
-@click.option('--fold', '-f', help='Which fold to train.', type=int)
-@click.option('--dataset_id', '-d', help='The dataset id to train.', type=str)
-def main(fold: int, dataset_id: str) -> None:
+@click.option('-fold', '-f', help='Which fold to train.', type=int)
+@click.option('-dataset_id', '-d', help='The dataset id to train.', type=str)
+@click.option('-model', '-m', help='Path to model json definition.', type=str)
+@click.option('--save_latest', '--sl', help='Should weights be saved every epoch', type=bool, is_flag=True)
+def main(fold: int, dataset_id: str, model: str, save_latest: bool) -> None:
     multiprocessing_logging.install_mp_handler()
+    assert os.path.exists(model), "The model path you specified doesn't exist."
     dataset_name = get_dataset_name_from_id(dataset_id)
-    trainer = Trainer(dataset_name, fold)
+    trainer = Trainer(dataset_name, fold, save_latest, model)
     trainer.train()
 
 
