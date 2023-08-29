@@ -1,5 +1,3 @@
-import shutil
-
 from src.utils.utils import write_json, get_dataset_name_from_id, check_raw_exists, get_raw_datapoints, \
     get_dataloaders_from_fold
 from src.preprocessing.utils import maybe_make_preprocessed, get_labels_from_raw, calculate_mean_std
@@ -9,9 +7,9 @@ from src.preprocessing.splitting import Splitter
 import click
 from typing import Dict, List, Union, Tuple
 from tqdm import tqdm
-import torch
 from torchvision.transforms import Normalize
 import time
+
 
 def build_config(dataset_name: str, processes: int) -> None:
     """
@@ -69,7 +67,15 @@ def get_case_to_label_mapping(datapoints: List[Datapoint]) -> Dict[str, int]:
     return mapping
 
 
-def process_fold(dataset_name: str, fold: int):
+def process_fold(dataset_name: str, fold: int, normalize: bool) -> None:
+    """
+    Preprocesses a fold. This method indirectly triggers saving of metadata if necessary, writes data to proper folder,
+    and will perform any other future preprocessing.
+    :param dataset_name: The name of the dataset that we are working on.
+    :param fold: The fold that we are currently preprocessing.
+    :param normalize: Weather or not we should normalize data before saving.
+    :return: Nothing.
+    """
     print(f"Now starting with fold {fold}...")
     time.sleep(1)
     train_loader, val_loader = get_dataloaders_from_fold(dataset_name, fold,
@@ -89,8 +95,11 @@ def process_fold(dataset_name: str, fold: int):
                 tqdm(train_loader if _set == 'train' else val_loader, desc=f"Preprocessing {_set} set"):
             point = points[0]
             writer = point.reader_writer
+            data = data[0].float().squeeze()  # Take 0 cause batched
+            if normalize:
+                data = Normalize(mean=mean, std=std)(data)
             writer.write(
-                Normalize(mean=mean, std=std)(data[0].float().squeeze()),
+                data,
                 f"{PREPROCESSED_ROOT}/{dataset_name}/fold_{fold}/{_set}/{point.case_name}.{point.extension}"
             )
 
@@ -119,6 +128,7 @@ def main(folds: int, processes: int, normalize: bool, dataset_id: str):
     # Here we will find what labels are present in the dataset. We will also map them to int labels, and save the
     # mappings.
     labels = get_labels_from_raw(dataset_name)
+    assert len(labels) > 1, "We only found one label folder, maybe the folder structure is wrong."
     label_to_id_mapping, id_to_label_mapping = map_labels_to_id(labels, return_inverse=True)
     write_json(label_to_id_mapping, f"{PREPROCESSED_ROOT}/{dataset_name}/label_to_id.json")
     write_json(id_to_label_mapping, f"{PREPROCESSED_ROOT}/{dataset_name}/id_to_label.json")
@@ -130,7 +140,7 @@ def main(folds: int, processes: int, normalize: bool, dataset_id: str):
     write_json(splits_map, f"{PREPROCESSED_ROOT}/{dataset_name}/folds.json")
     # We now have the folds: time to preprocess the data
     for fold_id, _ in splits_map.items():
-        process_fold(dataset_name, fold_id)
+        process_fold(dataset_name, fold_id, normalize)
 
     print("Preprocessing completed!")
 

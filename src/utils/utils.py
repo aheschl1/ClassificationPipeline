@@ -12,6 +12,13 @@ from src.dataloading.dataset import PipelineDataset
 
 
 def write_json(data: Dict, path: str, create_folder: bool = False) -> None:
+    """
+    Write helper for json.
+    :param data: Dictionary data to be written.
+    :param path: The path to write.
+    :param create_folder: If the path doesn't exist, should we create folders?
+    :return: None
+    """
     if not os.path.exists('/'.join(path.split('/')[0:-1])):
         assert create_folder, 'Path does not exist, and you did not indicate create_folder.'
         os.makedirs(path)
@@ -30,7 +37,12 @@ def read_json(path: str) -> Dict:
         return json.load(file)
 
 
-def get_dataset_name_from_id(id) -> str:
+def get_dataset_name_from_id(id: Union[str, int]) -> str:
+    """
+    Given a dataset if that could be xxx or xx or x. Formats dataset id into dataset name.
+    :param id: The dataset id
+    :return: The dataset name.
+    """
     if isinstance(id, int):
         id = str(id)
     if len(id) != 3:
@@ -39,12 +51,23 @@ def get_dataset_name_from_id(id) -> str:
 
 
 def check_raw_exists(dataset_name: str) -> bool:
+    """
+    Checks if the raw folder for a given dataset exists.
+    :param dataset_name: The name of the dataset to check.
+    :return: True if the raw folder exists, False otherwise.
+    """
     assert "Dataset_" in dataset_name, f"You passed {dataset_name} to utils/check_raw_exists. Expected a dataset " \
                                        f"folder name."
     return os.path.exists(f"{RAW_ROOT}/{dataset_name}")
 
 
-def verify_case_name(case_name: str):
+def verify_case_name(case_name: str) -> None:
+    """
+    Verifies that a case is named appropriately.
+    If the case is named wrong, crashes the program.
+    :param case_name: The name to check.
+    :return: None
+    """
     assert 'case_' in case_name, f"Invalid case name {case_name} in one of your folders. Case name " \
                                  "should be format case_xxxxx."
     assert len(case_name.split('_')[-1]) == 5, f"Invalid case name {case_name} in one of your folders. Case name " \
@@ -52,6 +75,12 @@ def verify_case_name(case_name: str):
 
 
 def get_raw_datapoints(dataset_name: str, label_to_id_mapping: Dict[str, int]) -> List[Datapoint]:
+    """
+    Given the name of a dataset, gets a list of datapoint objects.
+    :param dataset_name: The name of the dataset.
+    :param label_to_id_mapping: The label to id mapping for converting label name to number.
+    :return: List of datapoints in the dataset.
+    """
     dataset_root = f"{RAW_ROOT}/{dataset_name}/*/**"
     sample_paths = glob.glob(dataset_root)
     datapoints = []
@@ -93,8 +122,13 @@ def get_preprocessed_datapoints(dataset_name: str, label_to_id_mapping: Dict[str
 
 
 def get_raw_datapoints_folded(dataset_name: str, fold: int) -> Tuple[List[Datapoint], List[Datapoint]]:
+    """
+    Given a dataset name, returns the train and val points given a fold.
+    :param dataset_name: The name of the dataset.
+    :param fold: The fold to fetch.
+    :return: Train and val points.
+    """
     fold = get_folds_from_dataset(dataset_name)[str(fold)]
-    config = get_config_from_dataset(dataset_name)
 
     datapoints = get_raw_datapoints(dataset_name, get_label_mapping_from_dataset(dataset_name))
     train_points, val_points = [], []
@@ -112,6 +146,12 @@ def get_raw_datapoints_folded(dataset_name: str, fold: int) -> Tuple[List[Datapo
 
 def get_label_mapping_from_dataset(dataset_name: str, return_inverse: bool = False) -> Union[
     Tuple[Dict[str, int], Dict[int, str]], Dict[str, int]]:
+    """
+    Given a dataset name gets the label mapping from the preprocessed folder.
+    :param dataset_name: The name of the dataset of interest.
+    :param return_inverse: Whether to also return inverse mapping.
+    :return: The label mapping requested.
+    """
     label_to_id = f"{PREPROCESSED_ROOT}/{dataset_name}/label_to_id.json"
     id_to_label = f"{PREPROCESSED_ROOT}/{dataset_name}/id_to_label.json"
     label_to_id = read_json(label_to_id)
@@ -122,16 +162,31 @@ def get_label_mapping_from_dataset(dataset_name: str, return_inverse: bool = Fal
 
 
 def get_folds_from_dataset(dataset_name: str) -> Dict[str, Dict[str, List[str]]]:
+    """
+    Fetches and loads the fold json from a dataset.
+    :param dataset_name: The name of the dataset.
+    :return: The fold dictionary.
+    """
     path = f"{PREPROCESSED_ROOT}/{dataset_name}/folds.json"
     return read_json(path)
 
 
 def get_config_from_dataset(dataset_name: str) -> Dict:
+    """
+    Given a dataset name looks for a config file.
+    :param dataset_name: The name of the dataset.
+    :return: Config dictionary.
+    """
     path = f"{PREPROCESSED_ROOT}/{dataset_name}/config.json"
     return read_json(path)
 
 
 def batch_collate_fn(batch: List[Datapoint]) -> Tuple[torch.Tensor, torch.Tensor, List[Datapoint]]:
+    """
+    Combines data fetched by dataloader into proper format.
+    :param batch: List of data points from loader.
+    :return: Batched tensor data, labels, and list of datapoints.
+    """
     data = []
     labels = []
     for point in batch:
@@ -145,7 +200,17 @@ def get_dataloaders_from_fold(dataset_name: str, fold: int,
                               preprocessed_data: bool = True,
                               store_metadata: bool = False,
                               **kwargs) -> Tuple[DataLoader, DataLoader]:
-
+    """
+    Returns the train and val dataloaders for a specific dataset fold.
+    :param dataset_name: The name of the dataset.
+    :param fold: The fold to grab.
+    :param train_transforms: The transforms to apply to training data.
+    :param val_transforms: The transforms to apply to val data.
+    :param preprocessed_data: If true, grabs the preprocessed data,if false grabs the raw data.
+    :param store_metadata: If true, will tell the datapoints reader/writer to save metadata on read.
+    :param kwargs: Can overwrite some settings.
+    :return: Train and val dataloaders.
+    """
     config = get_config_from_dataset(dataset_name)
 
     train_points, val_points = get_preprocessed_datapoints(dataset_name, get_label_mapping_from_dataset(dataset_name),
