@@ -57,7 +57,7 @@ def get_raw_datapoints(dataset_name: str, label_to_id_mapping: Dict[str, int]) -
         label = label_to_id_mapping[label]
         name = path.split('/')[-1].split('.')[0]
         verify_case_name(name)
-        datapoints.append(Datapoint(path, label, case_name=name))
+        datapoints.append(Datapoint(path, label, case_name=name, dataset_name=dataset_name))
     return datapoints
 
 
@@ -83,9 +83,9 @@ def get_preprocessed_datapoints(dataset_name: str, label_to_id_mapping: Dict[str
         name = path.split('/')[-1].split('.')[0]
         verify_case_name(name)
         if path in val_paths:
-            val_datapoints.append(Datapoint(path, label, case_name=name))
+            val_datapoints.append(Datapoint(path, label, case_name=name, dataset_name=dataset_name))
         else:
-            train_datapoints.append(Datapoint(path, label, case_name=name))
+            train_datapoints.append(Datapoint(path, label, case_name=name, dataset_name=dataset_name))
     return train_datapoints, val_datapoints
 
 
@@ -130,21 +130,23 @@ def get_config_from_dataset(dataset_name: str) -> Dict:
 
 def get_dataloaders_from_fold(dataset_name: str, fold: int,
                               train_transforms=None, val_transforms=None,
-                              preprocessed_data: bool = True, **kwargs) -> Tuple[DataLoader, DataLoader]:
+                              preprocessed_data: bool = True,
+                              store_metadata: bool = False,
+                              **kwargs) -> Tuple[DataLoader, DataLoader]:
     config = get_config_from_dataset(dataset_name)
 
     train_points, val_points = get_preprocessed_datapoints(dataset_name, get_label_mapping_from_dataset(dataset_name),
                                                            fold) \
         if preprocessed_data else get_raw_datapoints_folded(dataset_name, fold)
 
-    train_dataset = PipelineDataset(train_points, train_transforms)
-    val_dataset = PipelineDataset(val_points, val_transforms)
+    train_dataset = PipelineDataset(train_points, train_transforms, store_metadata=store_metadata)
+    val_dataset = PipelineDataset(val_points, val_transforms, store_metadata=store_metadata)
 
     train_dataloader = DataLoader(
         train_dataset,
         batch_size=kwargs.get('batch_size', config['batch_size']),
         num_workers=kwargs.get('processes', config['processes']),
-        shuffle=True,
+        shuffle=kwargs.get('shuffle', True),
         pin_memory=True
     )
 
