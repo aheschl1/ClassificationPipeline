@@ -1,11 +1,13 @@
 from typing import List, Dict
 
-from sklearn.model_selection import train_test_split
-
+from sklearn.model_selection import train_test_split, KFold
 from src.dataloading.datapoint import Datapoint
 
 
 class Splitter:
+    """
+    For splitting data into folds.
+    """
     def __init__(self, data: List[Datapoint], folds: int) -> None:
         assert folds > 0, 'Folds must be > 0.'
         self.data = data
@@ -13,11 +15,22 @@ class Splitter:
 
     def get_split_map(self) -> Dict[int, Dict[str, List[str]]]:
         results = {}
-        for i in range(self.folds):
-            xtrain, xtest = train_test_split(self.data, random_state=i)
+        if self.folds > 1:
+            folder = KFold(n_splits=self.folds, shuffle=True)
+        else:
+            # Sklearn KFold only can handle folds > 1. Here, if we only have one fold, we just do a train/test split.
+            for i in range(self.folds):
+                xtrain, xtest = train_test_split(self.data, random_state=i)
+                results[i] = {
+                    'train': [x.case_name for x in xtrain],
+                    'val': [x.case_name for x in xtest]
+                }
+            return results
+        # if we still exist, then we continue with the KFold
+        for i, (train_idxs, test_idxs) in enumerate(folder.split(self.data)):
             results[i] = {
-                'train': [x.case_name for x in xtrain],
-                'val': [x.case_name for x in xtest]
+                'train': [self.data[x].case_name for x in train_idxs],
+                'val': [self.data[x].case_name for x in test_idxs]
             }
         return results
 
