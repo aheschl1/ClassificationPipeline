@@ -25,6 +25,7 @@ class Trainer:
         self.output_dir = self._prepare_output_directory()
         self._assert_preprocess_ready_for_train()
         self.config = get_config_from_dataset(dataset_name)
+        log(self.config)
         self.id_to_label = read_json(f"{PREPROCESSED_ROOT}/{dataset_name}/id_to_label.json")
         self.label_to_id = read_json(f"{PREPROCESSED_ROOT}/{dataset_name}/label_to_id.json")
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -39,8 +40,8 @@ class Trainer:
         preprocess_dir = f"{PREPROCESSED_ROOT}/{self.dataset_name}"
         assert os.path.exists(preprocess_dir), f"Preprocess root for dataset {self.dataset_name} does not exist. " \
                                                f"run src.preprocessing.preprocess_entry.py before training."
-        assert os.path.exists(f"{preprocess_dir}/fold_{self.fold}"), f"The preprocessed data path for fold {self.fold}" \
-                                                                     f" does not exist. womp womp"
+        assert os.path.exists(f"{preprocess_dir}/fold_{self.fold}"), \
+            f"The preprocessed data path for fold {self.fold} does not exist. womp womp"
 
     def _prepare_output_directory(self) -> str:
         session_id = str(uuid.uuid4())[0:5]
@@ -94,7 +95,7 @@ class Trainer:
             :param b: The second tensor
             :return: Count of agreement at dim 1
             """
-            assert a.shape == b.shape, f"Tensor a and b are different shapes."
+            assert a.shape == b.shape, f"Tensor a and b are different shapes. Got {a.shape} and {b.shape}"
             assert len(a.shape) == 2, f"Why is the prediction or gt shape of {a.shape}"
             results = torch.argmax(a, dim=1) == torch.argmax(b, dim=1)
             return results.sum().item()
@@ -119,7 +120,10 @@ class Trainer:
         epochs = self.config['epochs']
         start_time = time.time()
         best_val_loss = 9090909.  # Arbitrary large number
-
+        # last values to show change
+        last_train_loss = 0
+        last_val_loss = 0
+        last_val_accuracy = 0
         for epoch in range(epochs):
             log(self.seperator)
             log(f"Epoch {epoch + 1}/{epochs} starting.")
@@ -130,9 +134,13 @@ class Trainer:
                 mean_val_loss, val_accuracy = self._eval_single_epoch()
             if self.save_latest:
                 self.save_model_weights('latest')  # saving model every epoch
-            log(f"Train loss: {mean_train_loss}")
-            log(f"Val loss: {mean_val_loss}")
-            log(f"Val accuracy: {val_accuracy}")
+            log(f"Train loss: {mean_train_loss} =change= {mean_train_loss - last_train_loss}")
+            log(f"Val loss: {mean_val_loss} =change= {mean_val_loss - last_val_loss}")
+            log(f"Val accuracy: {val_accuracy} =change= {val_accuracy - last_val_accuracy}")
+            # update 'last' values
+            last_train_loss = mean_train_loss
+            last_val_loss = mean_val_loss
+            last_val_accuracy = val_accuracy
             # If best model, save!
             if mean_val_loss < best_val_loss:
                 log('Nice, that\'s a new best loss. Saving the weights!')
@@ -143,6 +151,7 @@ class Trainer:
         self.save_model_weights('final')  # save the final weights
         end_time = time.time()
         seconds_taken = end_time - start_time
+        log(self.seperator)
         log(f"Finished training {epochs} epochs.")
         log(f"{seconds_taken} seconds")
         log(f"{seconds_taken / 60} minutes")
@@ -154,6 +163,7 @@ class Trainer:
         torch.save(self.model.state_dict(), path)
 
     def _get_optim(self) -> torch.optim:
+        log(f"Optim being used is SGD")
         return SGD(
             self.model.parameters(),
             lr=self.config['lr']
@@ -162,16 +172,18 @@ class Trainer:
     def _get_model(self, path: str) -> nn.Module:
         gen = ModelGenerator(json_path=path)
         model = gen.get_model().to(self.device)
+        log('Model log args: ')
         log(gen.get_log_kwargs())
         return model
 
     @staticmethod
     def _get_loss() -> nn.Module:
-        log("Loss is nn.CrossEntropyLoss()")
+        log("Loss being used is nn.CrossEntropyLoss()")
         return nn.CrossEntropyLoss()
 
 
 def log(*messages):
+    print(*messages)
     for message in messages:
         logging.info(f"{message} ")
 
@@ -181,7 +193,8 @@ def log(*messages):
 @click.option('-dataset_id', '-d', help='The dataset id to train.', type=str)
 @click.option('-model', '-m', help='Path to model json definition.', type=str)
 @click.option('--save_latest', '--sl', help='Should weights be saved every epoch', type=bool, is_flag=True)
-@click.option('-state', '-s', help='The dataset id to work on.', type=str, default=ModuleStateController.TWO_D)
+@click.option('-state', '-s', help='Whether to trigger 2d or 3d model architecture. Only works with some modules.',
+              type=str, default=ModuleStateController.TWO_D)
 def main(fold: int, dataset_id: str, model: str, save_latest: bool, state: str) -> None:
     multiprocessing_logging.install_mp_handler()
     assert os.path.exists(model), "The model path you specified doesn't exist."

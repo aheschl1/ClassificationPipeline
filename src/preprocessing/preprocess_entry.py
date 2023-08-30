@@ -20,7 +20,9 @@ def build_config(dataset_name: str, processes: int) -> None:
     """
     config = {
         'batch_size': 8,
-        'processes': processes
+        'processes': processes,
+        'lr': 0.001,
+        'epochs': 10
     }
     write_json(config, f"{PREPROCESSED_ROOT}/{dataset_name}/config.json")
 

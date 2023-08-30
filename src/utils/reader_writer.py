@@ -49,7 +49,10 @@ class SimpleITKReaderWriter(BaseReaderWriter):
         if os.path.exists(expected_file):
             os.remove(expected_file)
         if not os.path.exists(expected_folder):
-            os.makedirs(expected_folder)
+            try:
+                os.makedirs(expected_folder)
+            except FileExistsError:
+                pass
         with open(expected_file, 'wb') as file:
             return pickle.dump(data, file)
 

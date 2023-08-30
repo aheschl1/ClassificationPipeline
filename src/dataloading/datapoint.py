@@ -1,4 +1,5 @@
 import numpy as np
+
 from src.utils.constants import *
 from src.utils.reader_writer import get_reader_writer
 
@@ -13,6 +14,7 @@ class Datapoint:
         self.reader_writer = get_reader_writer(writer)(case_name=case_name, dataset_name=dataset_name)
         self._case_name = case_name
         self.data = None
+        self.num_classes = None
 
     def get_data(self, **kwargs) -> np.array:
         return self.reader_writer.read(self.path, **kwargs)
@@ -23,6 +25,9 @@ class Datapoint:
     def clear_data(self):
         del self.data
         self.data = None
+
+    def set_num_classes(self, n: int) -> None:
+        self.num_classes = n
 
     @property
     def case_name(self) -> str:

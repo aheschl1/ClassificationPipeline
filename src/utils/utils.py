@@ -102,17 +102,16 @@ def get_preprocessed_datapoints(dataset_name: str, label_to_id_mapping: Dict[str
     :param fold:
     :return: Train points, Val points.
     """
-    train_root = f"{PREPROCESSED_ROOT}/{dataset_name}/fold_{fold}/*"
+    train_root = f"{PREPROCESSED_ROOT}/{dataset_name}/fold_{fold}/train/*"
     train_paths = glob.glob(train_root)
-    val_root = f"{PREPROCESSED_ROOT}/{dataset_name}/fold_{fold}/*"
+    val_root = f"{PREPROCESSED_ROOT}/{dataset_name}/fold_{fold}/val/*"
     val_paths = glob.glob(val_root)
     sample_paths = val_paths + train_paths
-
+    label_case_mapping = get_label_case_mapping_from_dataset(dataset_name)
     train_datapoints, val_datapoints = [], []
     for path in sample_paths:
-        label = path.split('/')[-2]
-        label = label_to_id_mapping[label]
         name = path.split('/')[-1].split('.')[0]
+        label = label_case_mapping[name]
         verify_case_name(name)
         if path in val_paths:
             val_datapoints.append(Datapoint(path, label, case_name=name, dataset_name=dataset_name))
@@ -181,6 +180,16 @@ def get_config_from_dataset(dataset_name: str) -> Dict:
     return read_json(path)
 
 
+def get_label_case_mapping_from_dataset(dataset_name: str) -> Dict:
+    """
+    Given a dataset name looks for a case_label_mapping file.
+    :param dataset_name: The name of the dataset.
+    :return: case_label_mapping dictionary
+    """
+    path = f"{PREPROCESSED_ROOT}/{dataset_name}/case_label_mapping.json"
+    return read_json(path)
+
+
 def batch_collate_fn(batch: List[Datapoint]) -> Tuple[torch.Tensor, torch.Tensor, List[Datapoint]]:
     """
     Combines data fetched by dataloader into proper format.
@@ -189,9 +198,14 @@ def batch_collate_fn(batch: List[Datapoint]) -> Tuple[torch.Tensor, torch.Tensor
     """
     data = []
     labels = []
+    num_classes = batch[0].num_classes
+    assert num_classes is not None, "All datapoints should have the property " \
+                                    "num_classes set before collate_fn. womp womp"
     for point in batch:
         data.append(point.data)
-        labels.append(torch.tensor(point.label))
+        label = torch.zeros(num_classes)
+        label[point.label] = 1
+        labels.append(label)
         point.clear_data()
 
     return torch.stack(data), torch.stack(labels), batch
