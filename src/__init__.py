@@ -1,5 +1,4 @@
 import sys
 
-sys.path.append(
-    '/home/andrewheschl/PycharmProjects/classification_pipeline/src'
-)
+# Adds the source to path for imports and stuff
+sys.path.append('/'.join(__file__.split('/')[:-1]))
