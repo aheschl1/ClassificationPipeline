@@ -14,6 +14,7 @@ from torch.utils.data import DataLoader
 from src.utils.constants import *
 from src.utils.utils import get_dataset_name_from_id, read_json, get_dataloaders_from_fold, get_config_from_dataset
 from src.json_models.src.model_generator import ModelGenerator
+from src.json_models.src.modules import ModuleStateController
 
 
 class Trainer:
@@ -180,9 +181,14 @@ def log(*messages):
 @click.option('-dataset_id', '-d', help='The dataset id to train.', type=str)
 @click.option('-model', '-m', help='Path to model json definition.', type=str)
 @click.option('--save_latest', '--sl', help='Should weights be saved every epoch', type=bool, is_flag=True)
-def main(fold: int, dataset_id: str, model: str, save_latest: bool) -> None:
+@click.option('-state', '-s', help='The dataset id to work on.', type=str, default=ModuleStateController.TWO_D)
+def main(fold: int, dataset_id: str, model: str, save_latest: bool, state: str) -> None:
     multiprocessing_logging.install_mp_handler()
     assert os.path.exists(model), "The model path you specified doesn't exist."
+    assert state in ['2d', '3d'], f"Specified state {state} does not exist. Use 2d or 3d"
+    print(f"Module state being set to {state}.")
+    # This sets the behavior of some modules in json models utils.
+    ModuleStateController.set_state(state)
     dataset_name = get_dataset_name_from_id(dataset_id)
     trainer = Trainer(dataset_name, fold, save_latest, model)
     trainer.train()
