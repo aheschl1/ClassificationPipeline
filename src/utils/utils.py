@@ -235,14 +235,19 @@ def get_dataloaders_from_fold(dataset_name: str, fold: int,
 
     train_dataset = PipelineDataset(train_points, train_transforms, store_metadata=store_metadata)
     val_dataset = PipelineDataset(val_points, val_transforms, store_metadata=store_metadata)
+    train_sampler, val_sampler = None, None
+    if 'sampler' in kwargs:
+        train_sampler = kwargs['sampler'](train_dataset)
+        val_sampler = kwargs['sampler'](val_dataset)
 
     train_dataloader = DataLoader(
         train_dataset,
         batch_size=kwargs.get('batch_size', config['batch_size']),
         num_workers=kwargs.get('processes', config['processes']),
-        shuffle=kwargs.get('shuffle', True),
+        shuffle=train_sampler is None,
         pin_memory=True,
-        collate_fn=batch_collate_fn
+        collate_fn=batch_collate_fn,
+        sampler=train_sampler
     )
 
     val_dataloader = DataLoader(
@@ -251,7 +256,8 @@ def get_dataloaders_from_fold(dataset_name: str, fold: int,
         num_workers=kwargs.get('processes', config['processes']),
         shuffle=False,
         pin_memory=True,
-        collate_fn=batch_collate_fn
+        collate_fn=batch_collate_fn,
+        sampler=val_sampler
     )
 
     return train_dataloader, val_dataloader

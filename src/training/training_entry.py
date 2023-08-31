@@ -15,25 +15,31 @@ from src.utils.constants import *
 from src.utils.utils import get_dataset_name_from_id, read_json, get_dataloaders_from_fold, get_config_from_dataset
 from src.json_models.src.model_generator import ModelGenerator
 from src.json_models.src.modules import ModuleStateController
+import torch.multiprocessing as mp
+from torch.utils.data.distributed import DistributedSampler
+from torch.nn.parallel import DistributedDataParallel as DDP
+from torch.distributed import init_process_group, destroy_process_group
 
 
 class Trainer:
-    def __init__(self, dataset_name: str, fold: int, save_latest: bool, model_path: str):
+    def __init__(self, dataset_name: str, fold: int, save_latest: bool, model_path: str, gpu_id: int):
+        assert torch.cuda.is_available()
         self.dataset_name = dataset_name
         self.fold = fold
         self.save_latest = save_latest
+        self.device = gpu_id
         self.output_dir = self._prepare_output_directory()
         self._assert_preprocess_ready_for_train()
         self.config = get_config_from_dataset(dataset_name)
         log(self.config)
         self.id_to_label = read_json(f"{PREPROCESSED_ROOT}/{dataset_name}/id_to_label.json")
         self.label_to_id = read_json(f"{PREPROCESSED_ROOT}/{dataset_name}/label_to_id.json")
-        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         log(f"device: {self.device}")
         self.seperator = "======================================================================="
         # Start on important stuff here
         self.train_dataloader, self.val_dataloader = self._get_dataloaders()
         self.model = self._get_model(model_path)
+        self.model = DDP(self.model, device_ids=[gpu_id])
         self.loss = Trainer._get_loss()
         self.optim = self._get_optim()
 
@@ -66,7 +72,8 @@ class Trainer:
             self.dataset_name,
             self.fold,
             train_transforms=train_transforms,
-            val_transforms=val_transforms
+            val_transforms=val_transforms,
+            sampler=DistributedSampler
         )
 
     def _train_single_epoch(self) -> float:
@@ -160,8 +167,9 @@ class Trainer:
         log(f"{(seconds_taken / 86400)} days")
 
     def save_model_weights(self, save_name: str) -> None:
-        path = f"{self.output_dir}/{save_name}.pth"
-        torch.save(self.model.state_dict(), path)
+        if self.device == 0:
+            path = f"{self.output_dir}/{save_name}.pth"
+            torch.save(self.model.module.state_dict(), path)
 
     def _get_optim(self) -> torch.optim:
         log(f"Optim being used is SGD")
@@ -191,6 +199,20 @@ def log(*messages):
         logging.info(f"{message} ")
 
 
+def setup_ddp(rank: int, world_size: int) -> None:
+    os.environ['MASTER_ADDR'] = "localhost"
+    os.environ['MASTER_PORT'] = "12345"
+    init_process_group(backend='nccl', rank=rank, world_size=world_size)
+
+
+def ddp_training(rank, world_size: int, dataset_id: int, fold: int, save_latest: bool, model: str) -> None:
+    setup_ddp(rank, world_size)
+    dataset_name = get_dataset_name_from_id(dataset_id)
+    trainer = Trainer(dataset_name, fold, save_latest, model, rank)
+    trainer.train()
+    destroy_process_group()
+
+
 @click.command()
 @click.option('-fold', '-f', help='Which fold to train.', type=int)
 @click.option('-dataset_id', '-d', help='The dataset id to train.', type=str)
@@ -198,16 +220,20 @@ def log(*messages):
 @click.option('--save_latest', '--sl', help='Should weights be saved every epoch', type=bool, is_flag=True)
 @click.option('-state', '-s', help='Whether to trigger 2d or 3d model architecture. Only works with some modules.',
               type=str, default=ModuleStateController.TWO_D)
-def main(fold: int, dataset_id: str, model: str, save_latest: bool, state: str) -> None:
+@click.option('--gpus', '-g', help='How many gpus for ddp', type=int, default=1)
+def main(fold: int, dataset_id: str, model: str, save_latest: bool, state: str, gpus: int) -> None:
     multiprocessing_logging.install_mp_handler()
     assert os.path.exists(model), "The model path you specified doesn't exist."
     assert state in ['2d', '3d'], f"Specified state {state} does not exist. Use 2d or 3d"
     print(f"Module state being set to {state}.")
     # This sets the behavior of some modules in json models utils.
     ModuleStateController.set_state(state)
-    dataset_name = get_dataset_name_from_id(dataset_id)
-    trainer = Trainer(dataset_name, fold, save_latest, model)
-    trainer.train()
+
+    mp.spawn(
+        ddp_training,
+        args=(gpus, dataset_id, fold, save_latest, model),
+        nprocs=gpus
+    )
 
 
 if __name__ == "__main__":

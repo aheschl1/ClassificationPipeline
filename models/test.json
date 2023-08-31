@@ -5,6 +5,13 @@
     "Tag": "efficientnet-b6",
     "Children": [
         {
+            "ComponentClass": "Conv",
+            "args": {
+                "in_channels": 128,
+                "out_channels": 3
+            }
+        },
+        {
             "ComponentClass": "enb6",
             "args": {
               "pretrained": true

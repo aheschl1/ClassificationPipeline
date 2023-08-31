@@ -7,14 +7,13 @@
         {
             "ComponentClass": "Conv",
             "args": {
-              "in_channels": 3,
-              "out_channels": 3
+                "in_channels": 3,
+                "out_channels": 3
             }
         },
         {
-          "ComponentClass": "Flatten",
-          "args": {
-          }
+            "ComponentClass": "Flatten",
+            "args": {}
         },
         {
             "ComponentClass": "Dropout",
@@ -34,7 +33,7 @@
             "ComponentClass": "Linear",
             "args": {
                 "in_features": 256,
-                "out_features": 7
+                "out_features": 3
             }
         }
     ]
