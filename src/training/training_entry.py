@@ -29,6 +29,7 @@ class Trainer:
         self.id_to_label = read_json(f"{PREPROCESSED_ROOT}/{dataset_name}/id_to_label.json")
         self.label_to_id = read_json(f"{PREPROCESSED_ROOT}/{dataset_name}/label_to_id.json")
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        log(f"device: {self.device}")
         self.seperator = "======================================================================="
         # Start on important stuff here
         self.train_dataloader, self.val_dataloader = self._get_dataloaders()

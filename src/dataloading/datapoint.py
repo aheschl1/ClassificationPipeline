@@ -1,17 +1,20 @@
 import numpy as np
 
-from src.utils.constants import *
-from src.utils.reader_writer import get_reader_writer
+from src.utils.reader_writer import get_reader_writer, get_reader_writer_from_extension
 
 
 class Datapoint:
     def __init__(self, path: str, label: int, dataset_name: str = None,
                  case_name: str = None,
-                 writer: str = SIMPLE_ITK) -> None:
+                 writer: str = None) -> None:
 
         self.path = path
         self.label = label
-        self.reader_writer = get_reader_writer(writer)(case_name=case_name, dataset_name=dataset_name)
+        if writer is not None:
+            self.reader_writer = get_reader_writer(writer)
+        else:
+            self.reader_writer = get_reader_writer_from_extension(self.extension)
+        self.reader_writer = self.reader_writer(case_name=case_name, dataset_name=dataset_name)
         self._case_name = case_name
         self.data = None
         self.num_classes = None

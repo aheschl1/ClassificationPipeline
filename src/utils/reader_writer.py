@@ -6,11 +6,18 @@ import numpy as np
 import torch
 
 from src.utils.constants import *
+from PIL import Image
 
 
 class BaseReaderWriter:
-    def __init__(self, **kwargs):
-        pass
+    def __init__(self, case_name: str, dataset_name: str = None):
+        super().__init__()
+        self.direction = None
+        self.spacing = None
+        self.origin = None
+        self.has_read = False
+        self.case_name = case_name
+        self.dataset_name = dataset_name
 
     def __verify_extension(self, extension: str) -> None:
         raise NotImplementedError("Do not use BaseReader, but instead use a subclass that overrides read.")
@@ -21,17 +28,11 @@ class BaseReaderWriter:
     def write(self, data: Union[Type[np.array], Type[torch.Tensor]], path: str) -> None:
         raise NotImplementedError("Do not use BaseWriter, but instead use a subclass that overrides write.")
 
+    def __store_metadata(self) -> None:
+        pass
+
 
 class SimpleITKReaderWriter(BaseReaderWriter):
-
-    def __init__(self, case_name: str, dataset_name: str = None):
-        super().__init__()
-        self.direction = None
-        self.spacing = None
-        self.origin = None
-        self.has_read = False
-        self.case_name = case_name
-        self.dataset_name = dataset_name
 
     def __verify_extension(self, extension: str) -> None:
         assert extension == 'nii.gz', f'Invalid extension {extension} for reader SimpleITKReader.'
@@ -94,12 +95,44 @@ class SimpleITKReaderWriter(BaseReaderWriter):
         image.SetSpacing(self.spacing)
         image.SetOrigin(self.origin)
         image.SetDirection(self.direction)
-        return sitk.WriteImage(image, path)
+        sitk.WriteImage(image, path)
+
+
+class NaturalReaderWriter(BaseReaderWriter):
+
+    def __verify_extension(self, extension: str) -> None:
+        assert extension in ['png', 'jpg', 'npy'], f'Invalid extension {extension} for reader NaturalReaderWriter.'
+
+    def read(self, path: str, store_metadata: bool = False) -> np.array:
+        extension = '.'.join(path.split('.')[1:])
+        self.__verify_extension(extension)
+        if extension == 'npy':
+            return np.load(path)
+        image = Image.open(path)
+        return np.array(image)
+
+    def write(self, data: Union[Type[np.array], Type[torch.Tensor]], path: str) -> None:
+        self.__verify_extension('.'.join(path.split('.')[1:]))
+        if isinstance(data, torch.Tensor):
+            data = np.array(data.detach().cpu())
+        np.save(path, data)
 
 
 def get_reader_writer(io: str) -> Type[BaseReaderWriter]:
     assert io in [SIMPLE_ITK], f'Unrecognized reader/writer {io}.'
     reader_writer_mapping = {
-        SIMPLE_ITK: SimpleITKReaderWriter
+        SIMPLE_ITK: SimpleITKReaderWriter,
+        NATURAL: NaturalReaderWriter
     }
     return reader_writer_mapping[io]
+
+
+def get_reader_writer_from_extension(extension: str) -> Type[BaseReaderWriter]:
+    mapping = {
+        'nii.gz': SimpleITKReaderWriter,
+        'png': NaturalReaderWriter,
+        'jpg': NaturalReaderWriter,
+        'npy': NaturalReaderWriter
+    }
+    assert extension in mapping.keys(), f"Currently unsupported extension {extension}"
+    return mapping[extension]

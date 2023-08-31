@@ -1,6 +1,7 @@
 import os
 
 SIMPLE_ITK = 'SimpleITK'
+NATURAL = 'NATURAL'
 DATA_ROOT = os.getenv('DATASET_ROOT')
 
 if DATA_ROOT is None or not os.path.exists(DATA_ROOT):

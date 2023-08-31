@@ -1,7 +1,7 @@
 import glob
 import os
 import shutil
-from typing import List, Tuple
+from typing import List, Tuple, Any
 
 import torch
 from torch.utils.data import DataLoader
@@ -39,12 +39,35 @@ def get_labels_from_raw(dataset_name: str) -> List[str]:
     return [f.split('/')[-1] for f in folders]
 
 
-def calculate_mean_std(dataloader: DataLoader) -> Tuple[float, float]:
+def _calculate_natural_image_mean_std(dataloader: DataLoader) -> Tuple[Any, Any]:
+    means = []
+    for data, _, _ in tqdm(dataloader, desc="Calculating mean"):
+        assert data.shape[0] == 1, "Expected batch size 1 for mean std calculations. Womp womp"
+        means.append(torch.mean(data.float(), dim=[0, 1, 2]))
+
+    means = torch.stack(means)
+    mu_rgb = torch.mean(means, dim=[0])
+    variances = []
+    for data, _, _ in tqdm(dataloader, desc="Calculating std"):
+        assert data.shape[0] == 1, "Expected batch size 1 for mean std calculations. Womp womp"
+        var = torch.mean((data - mu_rgb) ** 2, dim=[0, 1, 2])
+        variances.append(var)
+    variances = torch.stack(variances)
+    std_rgb = torch.sqrt(torch.mean(variances, dim=[0]))
+    return mu_rgb, std_rgb
+
+
+def calculate_mean_std(dataloader: DataLoader) -> Tuple[Any, Any]:
     """
-    Returns mean and std of entire dataset, not calculated across channel
+    Returns mean and std of entire dataset, calculated across channel for 3 channel inputs.
+    Expects [b, w, h, c]
     :param dataloader: Desired dataloader
     :return: mean and std
     """
+    extension = dataloader.dataset[0].extension
+    if extension in ['jpg', 'png']:
+        return _calculate_natural_image_mean_std(dataloader)
+
     psum = torch.tensor([0.0])
     psum_sq = torch.tensor([0.0])
     pixel_count = 0
@@ -54,8 +77,9 @@ def calculate_mean_std(dataloader: DataLoader) -> Tuple[float, float]:
         assert data.shape[0] == 1, "Expected batch size 1 for mean std calculations. Womp womp"
         psum += data.sum()
         psum_sq += (data ** 2).sum()
+
         pixels = 1.
-        for i in data.shape[1:]:
+        for i in data.shape:
             pixels *= i
         pixel_count += pixels
 
@@ -65,4 +89,4 @@ def calculate_mean_std(dataloader: DataLoader) -> Tuple[float, float]:
     total_std = torch.sqrt(total_var)
 
     # output
-    return total_mean.item(), total_std.item()
+    return total_mean, total_std

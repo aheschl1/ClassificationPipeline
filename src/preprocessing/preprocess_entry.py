@@ -27,6 +27,16 @@ def build_config(dataset_name: str, processes: int) -> None:
     write_json(config, f"{PREPROCESSED_ROOT}/{dataset_name}/config.json")
 
 
+def assert_all_images_same_shape(datapoints: List[Datapoint]) -> None:
+    shape = None
+    for point in tqdm(datapoints, desc="Verifying data integrity"):
+        point = point.get_data()
+        if shape is None:
+            shape = point.shape
+        assert point.shape == shape, 'Looks like you have some datapoints with different shapes. ' \
+                                     'Fix that first before coming here.'
+
+
 def get_folds(k: int, data: List[Datapoint]) -> Dict[int, Dict[str, list]]:
     """
     Gets random fold at 80/20 split. Returns in a map.
@@ -97,12 +107,13 @@ def process_fold(dataset_name: str, fold: int, normalize: bool) -> None:
                 tqdm(train_loader if _set == 'train' else val_loader, desc=f"Preprocessing {_set} set"):
             point = points[0]
             writer = point.reader_writer
-            data = data[0].float().squeeze()  # Take 0 cause batched
+            data = data[0].float().squeeze().permute(2, 0, 1)  # Take 0 cause batched
             if normalize:
                 data = Normalize(mean=mean, std=std)(data)
             writer.write(
                 data,
-                f"{PREPROCESSED_ROOT}/{dataset_name}/fold_{fold}/{_set}/{point.case_name}.{point.extension}"
+                f"{PREPROCESSED_ROOT}/{dataset_name}/fold_{fold}/{_set}/{point.case_name}."
+                f"{point.extension if point.extension == 'nii.gz' else 'npy'}"
             )
 
 
@@ -135,6 +146,7 @@ def main(folds: int, processes: int, normalize: bool, dataset_id: str):
     write_json(id_to_label_mapping, f"{PREPROCESSED_ROOT}/{dataset_name}/id_to_label.json")
     # Label stuff done, start with fetching data. We will also save a case to label mapping.
     datapoints = get_raw_datapoints(dataset_name, label_to_id_mapping)
+    assert_all_images_same_shape(datapoints)
     case_to_label_mapping = get_case_to_label_mapping(datapoints)
     write_json(case_to_label_mapping, f"{PREPROCESSED_ROOT}/{dataset_name}/case_label_mapping.json")
     splits_map = get_folds(folds, datapoints)
