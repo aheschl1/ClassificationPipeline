@@ -167,7 +167,9 @@ class Trainer:
         log(f"Optim being used is SGD")
         return SGD(
             self.model.parameters(),
-            lr=self.config['lr']
+            lr=self.config['lr'],
+            momentum=self.config.get('momentum', 0.9),
+            weight_decay=self.config.get('weight_decay', 0)
         )
 
     def _get_model(self, path: str) -> nn.Module:
