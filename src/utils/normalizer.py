@@ -8,6 +8,12 @@ from src.utils.constants import CT, NATURAL
 
 class Normalizer:
     def __init__(self, dataloader: DataLoader, active: bool = True, calculate_early: bool = True) -> None:
+        """
+        Given a dataloader, will wrap it and perform a normalization operation specific to the type of data.
+        :param dataloader: Iterator to wrap
+        :param active: If normalization should be applied to the data.
+        :param calculate_early: If calculations should be performed. If false, you must sync with another.
+        """
         self.active = active
         self.calculate_early = calculate_early
         self.mean, self.std = None, None
@@ -16,6 +22,11 @@ class Normalizer:
         self.dataloader = iter(dataloader)
 
     def _init(self, dataloader: DataLoader) -> None:
+        """
+        Performs calculations on the data.
+        :param dataloader: The wrapper dataloader.
+        :return: Nothing
+        """
         raise NotImplemented('Do not use the base class as an iterator.')
 
     def __iter__(self):
@@ -25,22 +36,44 @@ class Normalizer:
         return self.length
 
     def __next__(self) -> Tuple[torch.Tensor, torch.Tensor, Any]:
+        """
+        Next step in the iterator. If not active, just mirror the original dataloader.
+        :return:
+        """
         if not self.active:
             return next(self.dataloader)
         return self._normalize(*next(self.dataloader))
 
     def sync(self, other):
-        assert self.__class__ == other.__class__, f"Tried syncing type {self.__class__} with type {other.__class__}."
+        """
+        Syncs one normalizer with another. This is to share calculations across similar sets.
+        :param other: The other normalizer to sync with.
+        :return:
+        """
+        assert self.__class__ == other.__class__, \
+            f"You tried syncing type {self.__class__} with type {other.__class__}."
 
     def _normalize(self,
                    data: torch.Tensor,
                    label: torch.Tensor,
                    point: Any) -> Tuple[torch.Tensor, torch.Tensor, Any]:
+        """
+        Method where data normalization is computed.
+        :param data: The data to normalize.
+        :param label:
+        :param point:
+        :return: Normalized data and other two points
+        """
         pass
 
 
 class NaturalImageNormalizer(Normalizer):
     def _init(self, dataloader: DataLoader):
+        """
+        Computes three channel mean and std for natural image normalization.
+        :param dataloader:
+        :return:
+        """
         if not self.active or not self.calculate_early:
             return
         means = []
@@ -76,6 +109,11 @@ class NaturalImageNormalizer(Normalizer):
 
 class CTNormalizer(Normalizer):
     def _init(self, dataloader: DataLoader) -> None:
+        """
+        Computes mean and std across entire image for CT normalization.
+        :param dataloader:
+        :return:
+        """
         if not self.active or not self.calculate_early:
             return
         psum = torch.tensor([0.0])
@@ -99,7 +137,8 @@ class CTNormalizer(Normalizer):
         total_std = torch.sqrt(total_var)
 
         # output
-        self.mean = total_mean, self.std = total_std
+        self.mean = total_mean
+        self.std = total_std
 
     def sync(self, other):
         super().sync(other)
@@ -126,7 +165,8 @@ def get_normalizer_from_extension(extension: str) -> Type[Normalizer]:
     mapping = {
         'nii.gz': CTNormalizer,
         'png': NaturalImageNormalizer,
-        'jpg': NaturalImageNormalizer
+        'jpg': NaturalImageNormalizer,
+        'npy': NaturalImageNormalizer
     }
     assert extension in mapping.keys(), f"Currently unsupported extension {extension}"
     return mapping[extension]
