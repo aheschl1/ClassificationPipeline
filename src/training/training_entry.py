@@ -19,11 +19,27 @@ import torch.multiprocessing as mp
 from torch.utils.data.distributed import DistributedSampler
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.distributed import init_process_group, destroy_process_group
+import torch.distributed as dist
 
 
 class Trainer:
-    def __init__(self, dataset_name: str, fold: int, save_latest: bool, model_path: str, gpu_id: int):
-        assert torch.cuda.is_available()
+    def __init__(self,
+                 dataset_name: str,
+                 fold: int,
+                 save_latest: bool,
+                 model_path: str,
+                 gpu_id: int,
+                 checkpoint_name: str = None):
+        """
+        Trainer class for training and checkpointing of networks.
+        :param dataset_name: The name of the dataset to use.
+        :param fold: The fold in the dataset to use.
+        :param save_latest: If we should save a checkpoint each epoch
+        :param model_path: The path to the json that defines the architecture.
+        :param gpu_id: The gpu for this process to use.
+        :param checkpoint_name: None if we should train from scratch, otherwise the model weights that should be used.
+        """
+        assert torch.cuda.is_available(), "This pipeline only supports GPU training. No GPU was detected, womp womp."
         self.dataset_name = dataset_name
         self.fold = fold
         self.save_latest = save_latest
@@ -31,19 +47,28 @@ class Trainer:
         self.output_dir = self._prepare_output_directory()
         self._assert_preprocess_ready_for_train()
         self.config = get_config_from_dataset(dataset_name)
-        log(self.config)
+        if gpu_id == 0:
+            log("Config:", self.config)
         self.id_to_label = read_json(f"{PREPROCESSED_ROOT}/{dataset_name}/id_to_label.json")
         self.label_to_id = read_json(f"{PREPROCESSED_ROOT}/{dataset_name}/label_to_id.json")
-        log(f"device: {self.device}")
         self.seperator = "======================================================================="
         # Start on important stuff here
         self.train_dataloader, self.val_dataloader = self._get_dataloaders()
         self.model = self._get_model(model_path)
         self.model = DDP(self.model, device_ids=[gpu_id])
-        self.loss = Trainer._get_loss()
+        if checkpoint_name is not None:
+            self._load_checkpoint(checkpoint_name)
+        self.loss = self._get_loss()
         self.optim = self._get_optim()
+        log(f"Trainer finished initialized on rank {gpu_id}.")
+        dist.barrier()
 
     def _assert_preprocess_ready_for_train(self) -> None:
+        """
+        Ensures that the preprocess folder exists for the current dataset,
+        and that the fold specified has been processed.
+        :return: None
+        """
         preprocess_dir = f"{PREPROCESSED_ROOT}/{self.dataset_name}"
         assert os.path.exists(preprocess_dir), f"Preprocess root for dataset {self.dataset_name} does not exist. " \
                                                f"run src.preprocessing.preprocess_entry.py before training."
@@ -51,14 +76,19 @@ class Trainer:
             f"The preprocessed data path for fold {self.fold} does not exist. womp womp"
 
     def _prepare_output_directory(self) -> str:
+        """
+        Prepares the output directory, and sets up logging to it.
+        :return: str which is the output directory.
+        """
         session_id = str(uuid.uuid4())[0:5]
         output_dir = f"{RESULTS_ROOT}/{self.dataset_name}/fold_{self.fold}/{session_id}"
         os.makedirs(output_dir)
         logging.basicConfig(
-            level=logging.DEBUG,
+            level=logging.INFO,
             filename=f"{output_dir}/logs.txt"
         )
-        print(f"Sending logging and outputs to {output_dir}")
+        if self.device == 0:
+            print(f"Sending logging and outputs to {output_dir}")
         return output_dir
 
     def _get_dataloaders(self) -> Tuple[DataLoader, DataLoader]:
@@ -77,6 +107,10 @@ class Trainer:
         )
 
     def _train_single_epoch(self) -> float:
+        """
+        The training of each epoch is done here.
+        :return: The mean loss of the epoch.
+        """
         running_loss = 0.
         total_items = 0
         for data, labels, points in self.train_dataloader:
@@ -96,6 +130,10 @@ class Trainer:
         return running_loss / total_items
 
     def _eval_single_epoch(self) -> Tuple[float, float]:
+        """
+        Runs evaluation for a single epoch.
+        :return: The mean loss and mean accuracy respectively.
+        """
         def count_correct(a: torch.Tensor, b: torch.Tensor) -> int:
             """
             Given two tensors, counts the agreement using a one-hot encoding.
@@ -125,6 +163,10 @@ class Trainer:
         return running_loss / total_items, correct_count / total_items
 
     def train(self) -> None:
+        """
+        Starts the training process.
+        :return: None
+        """
         epochs = self.config['epochs']
         start_time = time.time()
         best_val_loss = 9090909.  # Arbitrary large number
@@ -133,8 +175,9 @@ class Trainer:
         last_val_loss = 0
         last_val_accuracy = 0
         for epoch in range(epochs):
-            log(self.seperator)
-            log(f"Epoch {epoch + 1}/{epochs} starting.")
+            if self.device == 0:
+                log(self.seperator)
+                log(f"Epoch {epoch + 1}/{epochs} starting.")
             self.model.train()
             mean_train_loss = self._train_single_epoch()
             self.model.eval()
@@ -142,37 +185,51 @@ class Trainer:
                 mean_val_loss, val_accuracy = self._eval_single_epoch()
             if self.save_latest:
                 self.save_model_weights('latest')  # saving model every epoch
-            log(f"Train loss: {mean_train_loss} =change= {mean_train_loss - last_train_loss}")
-            log(f"Val loss: {mean_val_loss} =change= {mean_val_loss - last_val_loss}")
-            log(f"Val accuracy: {val_accuracy} =change= {val_accuracy - last_val_accuracy}")
+            if self.device == 0:
+                log(f"Train loss: {mean_train_loss} --change-- {mean_train_loss - last_train_loss}")
+                log(f"Val loss: {mean_val_loss} --change-- {mean_val_loss - last_val_loss}")
+                log(f"Val accuracy: {val_accuracy} --change-- {val_accuracy - last_val_accuracy}")
             # update 'last' values
             last_train_loss = mean_train_loss
             last_val_loss = mean_val_loss
             last_val_accuracy = val_accuracy
             # If best model, save!
             if mean_val_loss < best_val_loss:
-                log('Nice, that\'s a new best loss. Saving the weights!')
+                if self.device == 0:
+                    log('Nice, that\'s a new best loss. Saving the weights!')
                 best_val_loss = mean_val_loss
                 self.save_model_weights('best')
 
         # Now training is completed, print some stuff
+        dist.barrier()
         self.save_model_weights('final')  # save the final weights
         end_time = time.time()
         seconds_taken = end_time - start_time
-        log(self.seperator)
-        log(f"Finished training {epochs} epochs.")
-        log(f"{seconds_taken} seconds")
-        log(f"{seconds_taken / 60} minutes")
-        log(f"{(seconds_taken / 3600)} hours")
-        log(f"{(seconds_taken / 86400)} days")
+        if self.device == 0:
+            log(self.seperator)
+            log(f"Finished training {epochs} epochs.")
+            log(f"{seconds_taken} seconds")
+            log(f"{seconds_taken / 60} minutes")
+            log(f"{(seconds_taken / 3600)} hours")
+            log(f"{(seconds_taken / 86400)} days")
 
     def save_model_weights(self, save_name: str) -> None:
+        """
+        Save the weights of the model, only if the current device is 0.
+        :param save_name: The name of the checkpoint to save.
+        :return: None
+        """
         if self.device == 0:
             path = f"{self.output_dir}/{save_name}.pth"
-            torch.save(self.model.module.state_dict(), path)
+            torch.save(self.model.state_dict(), path)
 
     def _get_optim(self) -> torch.optim:
-        log(f"Optim being used is SGD")
+        """
+        Instantiates and returns the optimizer.
+        :return: Optimizer object.
+        """
+        if self.device == 0:
+            log(f"Optim being used is SGD")
         return SGD(
             self.model.parameters(),
             lr=self.config['lr'],
@@ -181,34 +238,116 @@ class Trainer:
         )
 
     def _get_model(self, path: str) -> nn.Module:
+        """
+        Given the path to the network, generates the model, and verifies its integrity with onnx.
+        Additionally, the model will be saved with onnx for visualization at https://netron.app
+        :param path: The path to the json architecture definition.
+        :return: The pytorch network module.
+        """
+        def onnx_export() -> None:
+            """
+            Generates an onnx file with network topology data for visualization.
+            :return: None
+            """
+            log(f"Generating onnx model for visualization and to verify model sanity...\n")
+            dummy_input = torch.randn(1, *self.data_shape, device=torch.device(self.device))
+            input_names = ["actual_input_1"] + ["learned_%d" % i for i in range(16)]
+            output_names = ["output1"]
+            file = f"{self.output_dir}/model_topology.onnx"
+            torch.onnx.export(model, dummy_input, file,
+                              verbose=False,
+                              input_names=input_names,
+                              output_names=output_names)
+            log(f"Saved onnx model to {file}. Architecture works!")
+            log(f"Go to https://netron.app/ to view the architecture.")
+            log(self.seperator)
+
         gen = ModelGenerator(json_path=path)
         model = gen.get_model().to(self.device)
-        log('Model log args: ')
-        log(gen.get_log_kwargs())
+        if self.device == 0:
+            log('Model log args: ')
+            log(gen.get_log_kwargs())
+        if self.device == 0:
+            onnx_export()
         return model
 
-    @staticmethod
-    def _get_loss() -> nn.Module:
-        log("Loss being used is nn.CrossEntropyLoss()")
+    def _load_checkpoint(self, weights_name) -> None:
+        """
+        Loads network checkpoint onto the DDP model.
+        :param weights_name: The name of the weights to load in the form of *result folder*/*weight name*.pth
+        :return: None
+        """
+        log(f"Starting to load weights on process {self.device}...")
+        assert len(weights_name.split('/')) == 2,\
+            ("To load weights provide a path string in the format of *result folder*/*weight name*. "
+             "For example: h4f56/final.pth")
+        result_folder = weights_name.split('/')[0]
+        weights_name = weights_name.split('/')[-1]
+        weights_path = f"{RESULTS_ROOT}/{self.dataset_name}/fold_{self.fold}/{result_folder}/{weights_name}"
+        if not os.path.exists(weights_path):
+            raise FileNotFoundError(f'The file {weights_path} does not exist. Check the weights argument.')
+        map_location = {'cuda:0': f'cuda:{self.device}'}
+        weights = torch.load(weights_path, map_location=map_location)
+        self.model.load_state_dict(weights)
+        log(f"Successfully loaded weights on rank {self.device}.")
+
+    def _get_loss(self) -> nn.Module:
+        """
+        Build the criterion object.
+        :return: The loss function to be used.
+        """
+        if self.device == 0:
+            log("Loss being used is nn.CrossEntropyLoss()")
         return nn.CrossEntropyLoss()
+
+    @property
+    def data_shape(self) -> Tuple[int, int, int]:
+        """
+        Property which is the data shape we are training on.
+        :return: Shape of data.
+        """
+        return self.train_dataloader.dataset.datapoints[0].get_data().shape
 
 
 def log(*messages):
+    """
+    Prints to screen and logs a message.
+    :param messages: The messages to display and log.
+    :return: None
+    """
     print(*messages)
     for message in messages:
         logging.info(f"{message} ")
 
 
 def setup_ddp(rank: int, world_size: int) -> None:
+    """
+    Prepares the ddp on a specific process.
+    :param rank: The device we are initializing.
+    :param world_size: The total number of devices.
+    :return: None
+    """
     os.environ['MASTER_ADDR'] = "localhost"
     os.environ['MASTER_PORT'] = "12345"
     init_process_group(backend='nccl', rank=rank, world_size=world_size)
 
 
-def ddp_training(rank, world_size: int, dataset_id: int, fold: int, save_latest: bool, model: str) -> None:
+def ddp_training(rank, world_size: int, dataset_id: int,
+                 fold: int, save_latest: bool, model: str, load_weights: str) -> None:
+    """
+    Launches training on a single process using pytorch ddp.
+    :param rank: The rank we are starting.
+    :param world_size: The total number of devices
+    :param dataset_id: The dataset to train on
+    :param fold: The fold to train
+    :param save_latest: If the latest checkpoint should be saved per epoch
+    :param model: The path to the model json definition
+    :param load_weights: The weights to load, or None
+    :return: Nothing
+    """
     setup_ddp(rank, world_size)
     dataset_name = get_dataset_name_from_id(dataset_id)
-    trainer = Trainer(dataset_name, fold, save_latest, model, rank)
+    trainer = Trainer(dataset_name, fold, save_latest, model, rank, load_weights)
     trainer.train()
     destroy_process_group()
 
@@ -218,10 +357,23 @@ def ddp_training(rank, world_size: int, dataset_id: int, fold: int, save_latest:
 @click.option('-dataset_id', '-d', help='The dataset id to train.', type=str)
 @click.option('-model', '-m', help='Path to model json definition.', type=str)
 @click.option('--save_latest', '--sl', help='Should weights be saved every epoch', type=bool, is_flag=True)
-@click.option('-state', '-s', help='Whether to trigger 2d or 3d model architecture. Only works with some modules.',
+@click.option('-state', '-s',
+              help='Whether to trigger 2d or 3d model architecture. Only works with some modules.',
               type=str, default=ModuleStateController.TWO_D)
 @click.option('--gpus', '-g', help='How many gpus for ddp', type=int, default=1)
-def main(fold: int, dataset_id: str, model: str, save_latest: bool, state: str, gpus: int) -> None:
+@click.option('--load_weights', '-l', help='Weights to continue training with', type=str, default=None)
+def main(fold: int, dataset_id: str, model: str, save_latest: bool, state: str, gpus: int, load_weights: str) -> None:
+    """
+    Initializes training on multiple processes, and initializes logger.
+    :param fold:
+    :param dataset_id:
+    :param model:
+    :param save_latest:
+    :param state:
+    :param gpus:
+    :param load_weights:
+    :return:
+    """
     multiprocessing_logging.install_mp_handler()
     assert os.path.exists(model), "The model path you specified doesn't exist."
     assert state in ['2d', '3d'], f"Specified state {state} does not exist. Use 2d or 3d"
@@ -231,7 +383,7 @@ def main(fold: int, dataset_id: str, model: str, save_latest: bool, state: str, 
 
     mp.spawn(
         ddp_training,
-        args=(gpus, dataset_id, fold, save_latest, model),
+        args=(gpus, dataset_id, fold, save_latest, model, load_weights),
         nprocs=gpus
     )
 

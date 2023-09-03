@@ -14,7 +14,7 @@
         {
             "ComponentClass": "enb6",
             "args": {
-              "pretrained": true
+              "weights": "EfficientNet_B6_Weights.IMAGENET1K_V1"
             }
         },
         {
