@@ -2,9 +2,9 @@ name: class
 channels:
   - simpleitk
   - pytorch
-  - conda-forge
   - nvidia
   - anaconda
+  - conda-forge
   - defaults
 dependencies:
   - _libgcc_mutex=0.1=main
@@ -15,8 +15,8 @@ dependencies:
   - brotli-bin=1.0.9=h5eee18b_7
   - brotlipy=0.7.0=py38h27cfd23_1003
   - bzip2=1.0.8=h7b6447c_0
-  - ca-certificates=2023.05.30=h06a4308_0
-  - certifi=2023.7.22=py38h06a4308_0
+  - ca-certificates=2023.7.22=hbcca054_0
+  - certifi=2023.7.22=pyhd8ed1ab_0
   - cffi=1.15.1=py38h5eee18b_3
   - charset-normalizer=2.0.4=pyhd3eb1b0_0
   - click=8.0.4=py38h06a4308_0
@@ -119,6 +119,7 @@ dependencies:
   - nss=3.89.1=h6a678d5_0
   - numpy=1.24.3=py38hf6e8229_1
   - numpy-base=1.24.3=py38h060ed82_1
+  - onnx=1.13.1=py38h12ddb61_0
   - openh264=2.1.1=h4ff587b_0
   - openssl=3.0.10=h7f8727e_2
   - packaging=23.0=py38h06a4308_0
@@ -127,6 +128,7 @@ dependencies:
   - pip=23.2.1=py38h06a4308_0
   - ply=3.11=py38_0
   - pooch=1.4.0=pyhd3eb1b0_0
+  - protobuf=3.20.3=py38h6a678d5_0
   - pycparser=2.21=pyhd3eb1b0_0
   - pyopenssl=23.2.0=py38h06a4308_0
   - pyparsing=3.0.9=py38h06a4308_0

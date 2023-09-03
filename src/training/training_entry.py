@@ -1,7 +1,6 @@
 import logging
 import os.path
 import time
-import uuid
 from typing import Tuple
 
 import click
@@ -20,6 +19,52 @@ from torch.utils.data.distributed import DistributedSampler
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.distributed import init_process_group, destroy_process_group
 import torch.distributed as dist
+import matplotlib.pyplot as plt
+import datetime
+
+
+class LogHelper:
+    def __init__(self, output_dir: str):
+        self.output_dir = output_dir
+        self.losses_train, self.losses_val, self.accuracies_val = [], [], []
+
+    def epoch_end(self, train_loss: float, val_loss: float, val_accuracy: float):
+        self.losses_train.append(train_loss)
+        self.losses_val.append(val_loss)
+        self.accuracies_val.append(val_accuracy)
+
+    def save_figs(self) -> None:
+        num_epochs = len(self.accuracies_val)
+        # accuracy
+        plt.plot([i for i in range(num_epochs)], self.accuracies_val)
+        plt.title('Validation Accuracy VS Epoch')
+        plt.xlabel("Epoch")
+        plt.ylabel("Accuracy")
+        plt.savefig(f"{self.output_dir}/graph_accuracies.png")
+        plt.close()
+        # train loss
+        plt.plot([i for i in range(num_epochs)], self.losses_train)
+        plt.title('Train Loss VS Epoch')
+        plt.xlabel("Epoch")
+        plt.ylabel("Train Loss")
+        plt.savefig(f"{self.output_dir}/graph_train_loss.png")
+        plt.close()
+        # val loss
+        plt.plot([i for i in range(num_epochs)], self.losses_val)
+        plt.title('Validation Loss VS Epoch')
+        plt.xlabel("Epoch")
+        plt.ylabel("Validation Loss")
+        plt.savefig(f"{self.output_dir}/graph_val_loss.png")
+        plt.close()
+        # both losses
+        plt.plot([i for i in range(num_epochs)], self.losses_val, label="Val Loss")
+        plt.plot([i for i in range(num_epochs)], self.losses_train, label="Train Loss")
+        plt.title('Losses VS Epoch')
+        plt.xlabel("Epoch")
+        plt.ylabel("Loss")
+        plt.legend()
+        plt.savefig(f"{self.output_dir}/graph_both_loss.png")
+        plt.close()
 
 
 class Trainer:
@@ -29,6 +74,7 @@ class Trainer:
                  save_latest: bool,
                  model_path: str,
                  gpu_id: int,
+                 unique_folder_name: str,
                  checkpoint_name: str = None):
         """
         Trainer class for training and checkpointing of networks.
@@ -44,7 +90,8 @@ class Trainer:
         self.fold = fold
         self.save_latest = save_latest
         self.device = gpu_id
-        self.output_dir = self._prepare_output_directory()
+        self.output_dir = self._prepare_output_directory(unique_folder_name)
+        self.log_helper = LogHelper(self.output_dir)
         self._assert_preprocess_ready_for_train()
         self.config = get_config_from_dataset(dataset_name)
         if gpu_id == 0:
@@ -75,12 +122,11 @@ class Trainer:
         assert os.path.exists(f"{preprocess_dir}/fold_{self.fold}"), \
             f"The preprocessed data path for fold {self.fold} does not exist. womp womp"
 
-    def _prepare_output_directory(self) -> str:
+    def _prepare_output_directory(self, session_id: str) -> str:
         """
         Prepares the output directory, and sets up logging to it.
         :return: str which is the output directory.
         """
-        session_id = str(uuid.uuid4())[0:5]
         output_dir = f"{RESULTS_ROOT}/{self.dataset_name}/fold_{self.fold}/{session_id}"
         os.makedirs(output_dir)
         logging.basicConfig(
@@ -134,6 +180,7 @@ class Trainer:
         Runs evaluation for a single epoch.
         :return: The mean loss and mean accuracy respectively.
         """
+
         def count_correct(a: torch.Tensor, b: torch.Tensor) -> int:
             """
             Given two tensors, counts the agreement using a one-hot encoding.
@@ -186,9 +233,11 @@ class Trainer:
             if self.save_latest:
                 self.save_model_weights('latest')  # saving model every epoch
             if self.device == 0:
+                self.log_helper.epoch_end(mean_train_loss, mean_val_loss, val_accuracy)
                 log(f"Train loss: {mean_train_loss} --change-- {mean_train_loss - last_train_loss}")
                 log(f"Val loss: {mean_val_loss} --change-- {mean_val_loss - last_val_loss}")
                 log(f"Val accuracy: {val_accuracy} --change-- {val_accuracy - last_val_accuracy}")
+                self.log_helper.save_figs()
             # update 'last' values
             last_train_loss = mean_train_loss
             last_val_loss = mean_val_loss
@@ -207,6 +256,7 @@ class Trainer:
         seconds_taken = end_time - start_time
         if self.device == 0:
             log(self.seperator)
+            self.log_helper.save_figs()
             log(f"Finished training {epochs} epochs.")
             log(f"{seconds_taken} seconds")
             log(f"{seconds_taken / 60} minutes")
@@ -244,6 +294,7 @@ class Trainer:
         :param path: The path to the json architecture definition.
         :return: The pytorch network module.
         """
+
         def onnx_export() -> None:
             """
             Generates an onnx file with network topology data for visualization.
@@ -278,7 +329,7 @@ class Trainer:
         :return: None
         """
         log(f"Starting to load weights on process {self.device}...")
-        assert len(weights_name.split('/')) == 2,\
+        assert len(weights_name.split('/')) == 2, \
             ("To load weights provide a path string in the format of *result folder*/*weight name*. "
              "For example: h4f56/final.pth")
         result_folder = weights_name.split('/')[0]
@@ -333,9 +384,10 @@ def setup_ddp(rank: int, world_size: int) -> None:
 
 
 def ddp_training(rank, world_size: int, dataset_id: int,
-                 fold: int, save_latest: bool, model: str, load_weights: str) -> None:
+                 fold: int, save_latest: bool, model: str, session_id: str, load_weights: str) -> None:
     """
     Launches training on a single process using pytorch ddp.
+    :param session_id: Session id to be used for folder name on output.
     :param rank: The rank we are starting.
     :param world_size: The total number of devices
     :param dataset_id: The dataset to train on
@@ -347,7 +399,7 @@ def ddp_training(rank, world_size: int, dataset_id: int,
     """
     setup_ddp(rank, world_size)
     dataset_name = get_dataset_name_from_id(dataset_id)
-    trainer = Trainer(dataset_name, fold, save_latest, model, rank, load_weights)
+    trainer = Trainer(dataset_name, fold, save_latest, model, rank, session_id, load_weights)
     trainer.train()
     destroy_process_group()
 
@@ -380,10 +432,11 @@ def main(fold: int, dataset_id: str, model: str, save_latest: bool, state: str, 
     print(f"Module state being set to {state}.")
     # This sets the behavior of some modules in json models utils.
     ModuleStateController.set_state(state)
+    session_id = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%f')
 
     mp.spawn(
         ddp_training,
-        args=(gpus, dataset_id, fold, save_latest, model, load_weights),
+        args=(gpus, dataset_id, fold, save_latest, model, session_id, load_weights),
         nprocs=gpus
     )
 
