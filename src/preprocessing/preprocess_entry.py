@@ -1,6 +1,6 @@
 from src.utils.utils import write_json, get_dataset_name_from_id, check_raw_exists, get_raw_datapoints, \
     get_dataloaders_from_fold
-from src.preprocessing.utils import maybe_make_preprocessed, get_labels_from_raw, calculate_mean_std
+from src.preprocessing.utils import maybe_make_preprocessed, get_labels_from_raw
 from src.dataloading.datapoint import Datapoint
 from src.utils.constants import *
 from src.preprocessing.splitting import Splitter
@@ -103,15 +103,17 @@ def process_fold(dataset_name: str, fold: int, normalize: bool) -> None:
     os.mkdir(f"{PREPROCESSED_ROOT}/{dataset_name}/fold_{fold}/train")
     os.mkdir(f"{PREPROCESSED_ROOT}/{dataset_name}/fold_{fold}/val")
     # start saving preprocessed stuff
-    mean, std = calculate_mean_std(train_loader)
+    train_normalize_loader = train_loader.dataset[0].normalizer(train_loader, active=normalize)
+    val_normalize_loader = train_loader.dataset[0].normalizer(train_loader, active=normalize, calculate_early=False)
+    val_normalize_loader.sync(train_normalize_loader)
+
     for _set in ['train', 'val']:
         for data, labels, points in \
-                tqdm(train_loader if _set == 'train' else val_loader, desc=f"Preprocessing {_set} set"):
+                tqdm(train_normalize_loader if _set == 'train' else
+                     val_normalize_loader, desc=f"Preprocessing {_set} set"):
             point = points[0]
             writer = point.reader_writer
             data = data[0].float().squeeze().permute(2, 0, 1)  # Take 0 cause batched
-            if normalize:
-                data = Normalize(mean=mean, std=std)(data)
             writer.write(
                 data,
                 f"{PREPROCESSED_ROOT}/{dataset_name}/fold_{fold}/{_set}/{point.case_name}."

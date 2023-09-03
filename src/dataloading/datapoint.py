@@ -1,19 +1,27 @@
 import numpy as np
 
+from src.utils.normalizer import get_normalizer, get_normalizer_from_extension
 from src.utils.reader_writer import get_reader_writer, get_reader_writer_from_extension
 
 
 class Datapoint:
     def __init__(self, path: str, label: int, dataset_name: str = None,
                  case_name: str = None,
-                 writer: str = None) -> None:
+                 writer: str = None,
+                 normalizer: str = None) -> None:
 
         self.path = path
         self.label = label
+        # reader
         if writer is not None:
             self.reader_writer = get_reader_writer(writer)
         else:
             self.reader_writer = get_reader_writer_from_extension(self.extension)
+        # normalizer
+        if normalizer is not None:
+            self.normalizer = get_normalizer(writer)
+        else:
+            self.normalizer = get_normalizer_from_extension(self.extension)
         self.reader_writer = self.reader_writer(case_name=case_name, dataset_name=dataset_name)
         self._case_name = case_name
         self.data = None
