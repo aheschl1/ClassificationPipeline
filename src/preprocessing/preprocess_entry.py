@@ -104,7 +104,7 @@ def process_fold(dataset_name: str, fold: int, normalize: bool) -> None:
     os.mkdir(f"{PREPROCESSED_ROOT}/{dataset_name}/fold_{fold}/val")
     # start saving preprocessed stuff
     train_normalize_loader = train_loader.dataset[0].normalizer(train_loader, active=normalize)
-    val_normalize_loader = train_loader.dataset[0].normalizer(train_loader, active=normalize, calculate_early=False)
+    val_normalize_loader = val_loader.dataset[0].normalizer(val_loader, active=normalize, calculate_early=False)
     val_normalize_loader.sync(train_normalize_loader)
 
     for _set in ['train', 'val']:
@@ -113,7 +113,7 @@ def process_fold(dataset_name: str, fold: int, normalize: bool) -> None:
                      val_normalize_loader, desc=f"Preprocessing {_set} set"):
             point = points[0]
             writer = point.reader_writer
-            data = data[0].float().squeeze().permute(2, 0, 1)  # Take 0 cause batched
+            data = data[0].float().squeeze()  # Take 0 cause batched
             writer.write(
                 data,
                 f"{PREPROCESSED_ROOT}/{dataset_name}/fold_{fold}/{_set}/{point.case_name}."
