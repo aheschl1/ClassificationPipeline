@@ -11,6 +11,7 @@ class Normalizer:
         self.active = active
         self.calculate_early = calculate_early
         self.mean, self.std = None, None
+        self.length = len(dataloader)
         self._init(dataloader)
         self.dataloader = iter(dataloader)
 
@@ -19,6 +20,9 @@ class Normalizer:
 
     def __iter__(self):
         return self
+
+    def __len__(self):
+        return self.length
 
     def __next__(self) -> Tuple[torch.Tensor, torch.Tensor, Any]:
         if not self.active:
@@ -37,7 +41,7 @@ class Normalizer:
 
 class NaturalImageNormalizer(Normalizer):
     def _init(self, dataloader: DataLoader):
-        if not self.active and not self.calculate_early:
+        if not self.active or not self.calculate_early:
             return
         means = []
         for data, _, _ in tqdm(dataloader, desc="Calculating mean"):
@@ -67,12 +71,12 @@ class NaturalImageNormalizer(Normalizer):
                    data: torch.Tensor,
                    label: torch.Tensor,
                    point: Any) -> Tuple[torch.Tensor, torch.Tensor, Any]:
-        return Normalize(mean=self.mean, std=self.std)(data), label, point
+        return Normalize(mean=self.mean, std=self.std)(data.float().permute(0, 3, 1, 2)), label, point
 
 
 class CTNormalizer(Normalizer):
     def _init(self, dataloader: DataLoader) -> None:
-        if not self.active and not self.calculate_early:
+        if not self.active or not self.calculate_early:
             return
         psum = torch.tensor([0.0])
         psum_sq = torch.tensor([0.0])
@@ -106,7 +110,7 @@ class CTNormalizer(Normalizer):
                    data: torch.Tensor,
                    label: torch.Tensor,
                    point: Any) -> Tuple[torch.Tensor, torch.Tensor, Any]:
-        return Normalize(mean=self.mean, std=self.std)(data), label, point
+        return Normalize(mean=self.mean, std=self.std)(data.float().permute(0, 3, 1, 2)), label, point
 
 
 def get_normalizer(norm: str) -> Type[Normalizer]:
