@@ -1,4 +1,8 @@
 import json
+from typing import Union
+
+from torch import nn
+
 from src.json_models.src.model_builder import ModelBuilder
 
 
@@ -6,13 +10,15 @@ class ModelGenerator:
     def __init__(self, json_path: str) -> None:
         """
         Given a path to a json model skeleton, helps builds a model, and verifies that the json is correct.
+        :param json_path: The path to the json file to parse.
         """
         self.json_path = json_path
         self._build_architecture()
 
     def _build_architecture(self) -> None:
         """
-        Verifies the json structure, and then creates model.
+        Builds the model and stores it in self model variable.
+        :return: Nothing
         """
         with open(self.json_path) as file:
             model_definition = json.load(file)
@@ -31,18 +37,26 @@ class ModelGenerator:
 
         self.model = model
 
-    def get_model(self):
+    def get_model(self) -> nn.Module:
         """
         Returns the generated model.
         """
         return self.model
 
-    def get_log_kwargs(self):
+    def get_log_kwargs(self) -> Union[dict, None]:
+        """
+        Returns the log args that were specified in the json.
+        :return:
+        """
         return self.log_kwargs
 
     @staticmethod
     def _convert_unetlike_to_normal(model_definition: dict) -> dict:
-
+        """
+        Convert a json that was defined with unet syntax into the normal fully sequential representation.
+        :param model_definition: The model dictionary.
+        :return: The updated model dictionary.
+        """
         encoder_elements = model_definition['Encoder']
         middle_elements = model_definition['Middle']
         decoder_elements = model_definition['Decoder']
@@ -63,7 +77,8 @@ class ModelGenerator:
     def verify_structure(model_definition: dict) -> bool:
         """
         Verifies that the structure of a json model is valid.
-        Returns true if so, raises an exception otherwise.
+        :param model_definition: The model dictionary to verify.
+        :return: Returns true if valid, raises an exception otherwise.
         """
         keys = model_definition.keys()
 
@@ -102,7 +117,8 @@ class ModelGenerator:
     def verify_unet_structure(model_definition: dict) -> bool:
         """
         Verifies that the structure of a json model is valid.
-        Returns true if so, raises an exception otherwise.
+        :param model_definition: The model dictionary to verify.
+        :return: Returns true if valid, raises an exception otherwise.
         """
         keys = model_definition.keys()
         if not ('Encoder' in keys and 'Decoder' in keys and 'Middle' in keys) or len(keys) != 3:
@@ -128,7 +144,8 @@ class ModelGenerator:
     def _validate_node(keys) -> bool:
         """
         Verifies that the keys of a node are valid.
-        Returns true if so, raises an exception otherwise.
+        :param keys: The list of keys.
+        :return: Returns true if all keys are valid, raises an exception otherwise.
         """
         if 'Tag' in keys and 'Children' not in keys:
             raise InvalidJsonArchitectureException("You must define 'Tag' and 'Children' together.")
@@ -143,11 +160,5 @@ class InvalidJsonArchitectureException(Exception):
     """
     Exception raised when a user tries to build a model with invalid json.
     """
-
     def __init__(self, message="Invalid model architecture in json."):
-        self.message = message
-        super().__init__(self.message)
-
-
-if __name__ == "__main__":
-    factory = ModelGenerator("/home/andrewheschl/Documents/3DSegmentation/src/models/model_definitions/unetlike.json")
+        super().__init__(message)

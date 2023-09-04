@@ -28,8 +28,7 @@ class BaseReaderWriter:
     def write(self, data: Union[Type[np.array], Type[torch.Tensor]], path: str) -> None:
         raise NotImplementedError("Do not use BaseWriter, but instead use a subclass that overrides write.")
 
-    def __store_metadata(self) -> None:
-        pass
+    def __store_metadata(self) -> None: ...
 
 
 class SimpleITKReaderWriter(BaseReaderWriter):

@@ -24,16 +24,32 @@ import datetime
 
 
 class LogHelper:
-    def __init__(self, output_dir: str):
+    def __init__(self, output_dir: str) -> None:
+        """
+        This class is for the storage and graphing of loss/accuracy data throughout training.
+        :param output_dir: Folder on device where graphs should be output.
+        """
+        assert os.path.exists(output_dir), f"Output directory {output_dir} doesn't exist."
         self.output_dir = output_dir
         self.losses_train, self.losses_val, self.accuracies_val = [], [], []
 
-    def epoch_end(self, train_loss: float, val_loss: float, val_accuracy: float):
+    def epoch_end(self, train_loss: float, val_loss: float, val_accuracy: float) -> None:
+        """
+        Called at the end of an epoch and updates the lists of data.
+        :param train_loss: The train loss of the epoch
+        :param val_loss: The validation loss from the epoch
+        :param val_accuracy: The validation accuracy from the epoch
+        :return: Nothing
+        """
         self.losses_train.append(train_loss)
         self.losses_val.append(val_loss)
         self.accuracies_val.append(val_accuracy)
 
     def save_figs(self) -> None:
+        """
+        Saves four graphs to file. Val/Train loss, val accuracy, and each loss separate.
+        :return: Nothing
+        """
         num_epochs = len(self.accuracies_val)
         # accuracy
         plt.plot([i for i in range(num_epochs)], self.accuracies_val)
@@ -66,6 +82,7 @@ class LogHelper:
         plt.savefig(f"{self.output_dir}/graph_both_loss.png")
         plt.close()
 
+    def test(self): ...
 
 class Trainer:
     def __init__(self,
@@ -417,13 +434,13 @@ def ddp_training(rank, world_size: int, dataset_id: int,
 def main(fold: int, dataset_id: str, model: str, save_latest: bool, state: str, gpus: int, load_weights: str) -> None:
     """
     Initializes training on multiple processes, and initializes logger.
-    :param fold:
-    :param dataset_id:
-    :param model:
-    :param save_latest:
-    :param state:
-    :param gpus:
-    :param load_weights:
+    :param gpus: How many gpus to train with
+    :param state: 2d or 3d module state
+    :param dataset_id: The dataset to train on
+    :param fold: The fold to train
+    :param save_latest: If the latest checkpoint should be saved per epoch
+    :param model: The path to the model json definition
+    :param load_weights: The weights to load, or None
     :return:
     """
     multiprocessing_logging.install_mp_handler()

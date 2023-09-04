@@ -56,15 +56,7 @@ class Normalizer:
     def _normalize(self,
                    data: torch.Tensor,
                    label: torch.Tensor,
-                   point: Any) -> Tuple[torch.Tensor, torch.Tensor, Any]:
-        """
-        Method where data normalization is computed.
-        :param data: The data to normalize.
-        :param label:
-        :param point:
-        :return: Normalized data and other two points
-        """
-        pass
+                   point: Any) -> Tuple[torch.Tensor, torch.Tensor, Any]: ...
 
 
 class NaturalImageNormalizer(Normalizer):
@@ -104,6 +96,13 @@ class NaturalImageNormalizer(Normalizer):
                    data: torch.Tensor,
                    label: torch.Tensor,
                    point: Any) -> Tuple[torch.Tensor, torch.Tensor, Any]:
+        """
+        Method where data normalization is computed.
+        :param data: The data to normalize.
+        :param label:
+        :param point:
+        :return: Normalized data and other two points
+        """
         return Normalize(mean=self.mean, std=self.std)(data.float().permute(0, 3, 1, 2)), label, point
 
 
@@ -149,10 +148,22 @@ class CTNormalizer(Normalizer):
                    data: torch.Tensor,
                    label: torch.Tensor,
                    point: Any) -> Tuple[torch.Tensor, torch.Tensor, Any]:
+        """
+        Method where data normalization is computed.
+        :param data: The data to normalize.
+        :param label:
+        :param point:
+        :return: Normalized data and other two points
+        """
         return Normalize(mean=self.mean, std=self.std)(data.float().permute(0, 3, 1, 2)), label, point
 
 
 def get_normalizer(norm: str) -> Type[Normalizer]:
+    """
+    Given a name of a normalizer, returns the class.
+    :param norm: The name of the desired normalizer. Use constants.
+    :return: Normalizer subclass.
+    """
     assert norm in [NATURAL, CT], f'Unrecognized normalizer type {norm}.'
     norm_mapping = {
         CT: CTNormalizer,
@@ -162,6 +173,11 @@ def get_normalizer(norm: str) -> Type[Normalizer]:
 
 
 def get_normalizer_from_extension(extension: str) -> Type[Normalizer]:
+    """
+    Given a file extension, determines which normalizer would be appropriate for the data. Returns it.
+    :param extension: The extension of the data.
+    :return: Normalizer subclass
+    """
     mapping = {
         'nii.gz': CTNormalizer,
         'png': NaturalImageNormalizer,

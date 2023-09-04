@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 
 from src.json_models.src.utils import my_import
@@ -7,7 +8,9 @@ class ModelBuilder(nn.Module):
 
     def __init__(self, tag: str, children: list) -> None:
         """
-        Given a tag, and a list of children components, builds a neural network.
+        Builds a module based on a list of children.
+        :param tag: Name for the current module. Does nothing.
+        :param children: List of children in dictionary form.
         """
         super(ModelBuilder, self).__init__()
         self.tag = tag
@@ -19,7 +22,8 @@ class ModelBuilder(nn.Module):
 
     def _construct(self) -> None:
         """
-        Constructs the networks compnents in a recursive fashion.
+        Constructs the internal module based on children list.
+        :return: None
         """
         for child in self.child_modules:
             if 'Tag' in child.keys():
@@ -51,7 +55,12 @@ class ModelBuilder(nn.Module):
 
                 self.sequences[len(self.self_modules) - 1] = this_operation
 
-    def forward(self, x) -> None:
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Performs the forward pass and manages skipped connections.
+        :param x: The data to compute.
+        :return: The output data.
+        """
         for i, module in enumerate(self.self_modules):
 
             if i not in self.sequences.keys():

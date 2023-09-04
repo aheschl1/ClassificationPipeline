@@ -6,6 +6,9 @@ from src.utils.constants import *
 def my_import(class_name: str, dropout_package: str = 'torch.nn'):
     """
     Returns a class based on a string name.
+    :param class_name: The name of the object being searched for.
+    :param dropout_package: The package to look into of the class isn't in the if/else statements
+    :return: Any object defined in this long if/else sequence.
     """
     # Here checks backbones
     if class_name == ENB6:
