@@ -103,7 +103,8 @@ class NaturalReaderWriter(BaseReaderWriter):
         assert extension in ['png', 'jpg', 'npy'], f'Invalid extension {extension} for reader NaturalReaderWriter.'
 
     def read(self, path: str, store_metadata: bool = False) -> np.array:
-        extension = '.'.join(path.split('.')[1:])
+        name = path.split('/')[-1]
+        extension = '.'.join(name.split('.')[1:])
         self.__verify_extension(extension)
         if extension == 'npy':
             return np.load(path)
@@ -111,7 +112,8 @@ class NaturalReaderWriter(BaseReaderWriter):
         return np.array(image)
 
     def write(self, data: Union[Type[np.array], Type[torch.Tensor]], path: str) -> None:
-        self.__verify_extension('.'.join(path.split('.')[1:]))
+        name = path.split('/')[-1]
+        self.__verify_extension('.'.join(name.split('.')[1:]))
         if isinstance(data, torch.Tensor):
             data = np.array(data.detach().cpu())
         np.save(path, data)

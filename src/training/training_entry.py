@@ -1,3 +1,6 @@
+import sys
+# Adds the source to path for imports and stuff
+sys.path.append("/home/andrew.heschl/Documents/ClassificationPipeline")
 import logging
 import os.path
 import time
@@ -145,7 +148,8 @@ class Trainer:
         :return: str which is the output directory.
         """
         output_dir = f"{RESULTS_ROOT}/{self.dataset_name}/fold_{self.fold}/{session_id}"
-        os.makedirs(output_dir)
+        if self.device == 0:
+            os.makedirs(output_dir)
         logging.basicConfig(
             level=logging.INFO,
             filename=f"{output_dir}/logs.txt"
@@ -176,7 +180,9 @@ class Trainer:
         """
         running_loss = 0.
         total_items = 0
-        for data, labels, points in self.train_dataloader:
+        for data, labels, _ in self.train_dataloader:
+            print(_)
+            self.optim.zero_grad()
             data = data.to(self.device)
             labels = labels.to(self.device)
             batch_size = data.shape[0]
@@ -213,7 +219,7 @@ class Trainer:
         running_loss = 0.
         correct_count = 0.
         total_items = 0
-        for data, labels, points in self.val_dataloader:
+        for data, labels, _ in self.val_dataloader:
             data = data.to(self.device)
             labels = labels.to(self.device)
             batch_size = data.shape[0]

@@ -5,10 +5,9 @@
     "Tag": "efficientnet-b6",
     "Children": [
         {
-            "ComponentClass": "Conv",
+            "ComponentClass": "enb6",
             "args": {
-                "in_channels": 3,
-                "out_channels": 3
+                "weights": "EfficientNet_B6_Weights.IMAGENET1K_V1"
             }
         },
         {
@@ -16,24 +15,25 @@
             "args": {}
         },
         {
-            "ComponentClass": "Dropout",
-            "args": {
-                "p": 0.5,
-                "inplace": true
-            }
+            "ComponentClass":"ReLU",
+            "args":{}
         },
         {
             "ComponentClass": "Linear",
             "args": {
-                "in_features": 3145728,
+                "in_features": 1000,
                 "out_features": 256
             }
+        },
+        {
+            "ComponentClass":"ReLU",
+            "args":{}
         },
         {
             "ComponentClass": "Linear",
             "args": {
                 "in_features": 256,
-                "out_features": 3
+                "out_features": 7
             }
         }
     ]
