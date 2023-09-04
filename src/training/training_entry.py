@@ -1,6 +1,8 @@
 import sys
+
 # Adds the source to path for imports and stuff
 sys.path.append("/home/andrew.heschl/Documents/ClassificationPipeline")
+sys.path.append("/home/andrewheschl/PycharmProjects/classification_pipeline")
 import logging
 import os.path
 import time
@@ -85,7 +87,6 @@ class LogHelper:
         plt.savefig(f"{self.output_dir}/graph_both_loss.png")
         plt.close()
 
-    def test(self): ...
 
 class Trainer:
     def __init__(self,
@@ -181,7 +182,6 @@ class Trainer:
         running_loss = 0.
         total_items = 0
         for data, labels, _ in self.train_dataloader:
-            print(_)
             self.optim.zero_grad()
             data = data.to(self.device)
             labels = labels.to(self.device)
@@ -232,6 +232,7 @@ class Trainer:
 
         return running_loss / total_items, correct_count / total_items
 
+    # noinspection PyUnresolvedReferences
     def train(self) -> None:
         """
         Starts the training process.
@@ -245,6 +246,10 @@ class Trainer:
         last_val_loss = 0
         last_val_accuracy = 0
         for epoch in range(epochs):
+            # epoch timing
+            epoch_start_time = time.time()
+            self.train_dataloader.sampler.set_epoch(epoch)
+            self.val_dataloader.sampler.set_epoch(epoch)
             if self.device == 0:
                 log(self.seperator)
                 log(f"Epoch {epoch + 1}/{epochs} starting.")
@@ -271,6 +276,9 @@ class Trainer:
                     log('Nice, that\'s a new best loss. Saving the weights!')
                 best_val_loss = mean_val_loss
                 self.save_model_weights('best')
+            epoch_end_time = time.time()
+            if self.device == 0:
+                log(f"Process {self.device} took {epoch_end_time-epoch_start_time} seconds.")
 
         # Now training is completed, print some stuff
         dist.barrier()
