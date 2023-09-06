@@ -34,7 +34,6 @@ class Datapoint:
         self.data = self.reader_writer.read(self.path, **kwargs)
 
     def clear_data(self):
-        del self.data
         self.data = None
 
     def set_num_classes(self, n: int) -> None:

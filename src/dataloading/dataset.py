@@ -4,6 +4,7 @@ import torch
 from torch.utils.data import Dataset
 
 from src.dataloading.datapoint import Datapoint
+import psutil
 
 
 class PipelineDataset(Dataset):
@@ -19,6 +20,7 @@ class PipelineDataset(Dataset):
         self.transforms = transforms
         self.store_metadata = store_metadata
         self.num_classes = self._get_number_of_classes()
+        self.preloaded_data = {}
 
     def _get_number_of_classes(self):
         classes = set()
@@ -31,10 +33,25 @@ class PipelineDataset(Dataset):
 
     def __getitem__(self, idx) -> Datapoint:
         point = self.datapoints[idx]
-        point.load_data(store_metadata=self.store_metadata)
+        if point.path not in self.preloaded_data:
+            point.load_data(store_metadata=self.store_metadata)
+        else:
+            point.data = self.preloaded_data.pop(point.path)
         if self.transforms is not None:
             point.data = self.transforms(point.data)
         if not isinstance(point.data, torch.Tensor):
             point.data = torch.tensor(point.data)
         point.set_num_classes(self.num_classes)
         return point
+
+    @staticmethod
+    def available_memory() -> float:
+        """
+        Method for getting available memory.
+        :return: Total available memory in bytes.
+        """
+        return psutil.virtual_memory()[1]
+
+
+if __name__ == "__main__":
+    print(PipelineDataset.available_memory())
