@@ -26,6 +26,7 @@ class CardiacEchoViewPreprocessor(Preprocessor):
         assert os.path.exists(data_root), f"The data root {data_root} DNE."
         self.data_info = pd.read_excel(csv_path)
         self.data_root = data_root
+        self.target_shape = (800, 600)
 
     def process(self) -> None:
         self._build_output_folder()
@@ -33,7 +34,7 @@ class CardiacEchoViewPreprocessor(Preprocessor):
         data = [(row, self.dataset_name, self.data_root, get_case_name_from_number(i)) for i, row in
                 enumerate(row_series)]
         with Pool(os.cpu_count()) as pool:
-            pool.map(CardiacEchoViewPreprocessor._process_case, data)
+            pool.map(self._process_case, data)
         super().process()
 
     def _build_output_folder(self):
@@ -43,8 +44,7 @@ class CardiacEchoViewPreprocessor(Preprocessor):
                                               "Try a new dataset name, or delete the folder.")
         os.makedirs(raw_root)
 
-    @staticmethod
-    def _process_case(data: Tuple[pd.Series, str, str, str]) -> None:
+    def _process_case(self, data: Tuple[pd.Series, str, str, str]) -> None:
         row, dataset_name, root_dir, case_name = data
         if '-D' in row[LABEL]:
             row[LABEL] = row[LABEL].replace('-D', '')
@@ -59,12 +59,13 @@ class CardiacEchoViewPreprocessor(Preprocessor):
         # get data
         data_path = f"{root_dir}/{row[PATIENT_PATH]}/{row[FILE_NAME]}"
         if not os.path.exists(data_path):
-            print(f"Skipping {data_path}")
+            print(f"Skipping {row[PATIENT_PATH]}/{row[FILE_NAME]}. DNE")
             return
+        print(f"Working on {row[PATIENT_PATH]}/{row[FILE_NAME]}")
         data = CardiacEchoViewPreprocessor._read_dicom(data_path)
         data = CardiacEchoViewPreprocessor._apply_movement_mask(data)
         for im_slice in data:
-            im_slice = Image.fromarray(im_slice)
+            im_slice = Image.fromarray(im_slice).resize(self.target_shape)
             im_slice.save(f"{output_folder}/{case_name}.png")
 
     @staticmethod
@@ -90,8 +91,11 @@ class CardiacEchoViewPreprocessor(Preprocessor):
 @click.option('--data', '-d', help="Path to the data root.", required=True)
 @click.option('--set_id', '-s', help="The dataset id to target.", default=3, type=int)
 def main(csv: str, data: str, set_id: int):
-    processor = CardiacEchoViewPreprocessor(csv, data, set_id)
-    processor.process()
+    # processor = CardiacEchoViewPreprocessor(
+    #     csv, data, set_id
+    # )
+    # processor.process()
+    pass
 
 
 if __name__ == "__main__":
