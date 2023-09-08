@@ -67,6 +67,7 @@ class CardiacEchoViewPreprocessor(Preprocessor):
         for im_slice in data:
             im_slice = Image.fromarray(im_slice).resize(self.target_shape)
             im_slice.save(f"{output_folder}/{case_name}.png")
+        print(f"Completed {row[PATIENT_PATH]}/{row[FILE_NAME]}!")
 
     @staticmethod
     def _apply_movement_mask(image_array: np.array, k:int = 100) -> np.array:
