@@ -170,13 +170,14 @@ def get_folds_from_dataset(dataset_name: str) -> Dict[str, Dict[str, List[str]]]
     return read_json(path)
 
 
-def get_config_from_dataset(dataset_name: str) -> Dict:
+def get_config_from_dataset(dataset_name: str, config_name: str = 'config') -> Dict:
     """
     Given a dataset name looks for a config file.
+    :param config_name: Name of the config file to load
     :param dataset_name: The name of the dataset.
     :return: Config dictionary.
     """
-    path = f"{PREPROCESSED_ROOT}/{dataset_name}/config.json"
+    path = f"{PREPROCESSED_ROOT}/{dataset_name}/{config_name}.json"
     return read_json(path)
 
 

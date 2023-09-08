@@ -96,6 +96,7 @@ class Trainer:
                  model_path: str,
                  gpu_id: int,
                  unique_folder_name: str,
+                 config_name: str,
                  checkpoint_name: str = None):
         """
         Trainer class for training and checkpointing of networks.
@@ -114,7 +115,7 @@ class Trainer:
         self.output_dir = self._prepare_output_directory(unique_folder_name)
         self.log_helper = LogHelper(self.output_dir)
         self._assert_preprocess_ready_for_train()
-        self.config = get_config_from_dataset(dataset_name)
+        self.config = get_config_from_dataset(dataset_name, config_name)
         if gpu_id == 0:
             log("Config:", self.config)
         self.id_to_label = read_json(f"{PREPROCESSED_ROOT}/{dataset_name}/id_to_label.json")
@@ -415,9 +416,10 @@ def setup_ddp(rank: int, world_size: int) -> None:
 
 
 def ddp_training(rank, world_size: int, dataset_id: int,
-                 fold: int, save_latest: bool, model: str, session_id: str, load_weights: str) -> None:
+                 fold: int, save_latest: bool, model: str, session_id: str, load_weights: str, config: str) -> None:
     """
     Launches training on a single process using pytorch ddp.
+    :param config: The name of the config to load.
     :param session_id: Session id to be used for folder name on output.
     :param rank: The rank we are starting.
     :param world_size: The total number of devices
@@ -430,24 +432,33 @@ def ddp_training(rank, world_size: int, dataset_id: int,
     """
     setup_ddp(rank, world_size)
     dataset_name = get_dataset_name_from_id(dataset_id)
-    trainer = Trainer(dataset_name, fold, save_latest, model, rank, session_id, load_weights)
+    trainer = Trainer(dataset_name, fold, save_latest, model, rank, session_id, config, load_weights)
     trainer.train()
     destroy_process_group()
 
 
 @click.command()
-@click.option('-fold', '-f', help='Which fold to train.', type=int)
-@click.option('-dataset_id', '-d', help='The dataset id to train.', type=str)
-@click.option('-model', '-m', help='Path to model json definition.', type=str)
+@click.option('-fold', '-f', help='Which fold to train.', type=int, required=True)
+@click.option('-dataset_id', '-d', help='The dataset id to train.', type=str, required=True)
+@click.option('-model', '-m', help='Path to model json definition.', type=str, required=True)
 @click.option('--save_latest', '--sl', help='Should weights be saved every epoch', type=bool, is_flag=True)
 @click.option('-state', '-s',
               help='Whether to trigger 2d or 3d model architecture. Only works with some modules.',
               type=str, default=ModuleStateController.TWO_D)
 @click.option('--gpus', '-g', help='How many gpus for ddp', type=int, default=1)
 @click.option('--load_weights', '-l', help='Weights to continue training with', type=str, default=None)
-def main(fold: int, dataset_id: str, model: str, save_latest: bool, state: str, gpus: int, load_weights: str) -> None:
+@click.option('-config', '-c', help='Name of the config file to utilize.', type=str, default='config')
+def main(fold: int,
+         dataset_id: str,
+         model: str,
+         save_latest: bool,
+         state: str,
+         gpus: int,
+         load_weights: str,
+         config: str) -> None:
     """
     Initializes training on multiple processes, and initializes logger.
+    :param config: The name oof the config file to load.
     :param gpus: How many gpus to train with
     :param state: 2d or 3d module state
     :param dataset_id: The dataset to train on
@@ -467,7 +478,7 @@ def main(fold: int, dataset_id: str, model: str, save_latest: bool, state: str, 
 
     mp.spawn(
         ddp_training,
-        args=(gpus, dataset_id, fold, save_latest, model, session_id, load_weights),
+        args=(gpus, dataset_id, fold, save_latest, model, session_id, load_weights, config),
         nprocs=gpus
     )
 

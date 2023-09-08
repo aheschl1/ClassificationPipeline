@@ -61,12 +61,12 @@ class Preprocessor:
         :return: None
         """
         config = {
-            'batch_size': 8,
+            'batch_size': 16,
             'processes': self.processes,
-            'lr': 0.001,
+            'lr': 0.01,
             'epochs': 10,
-            'momentum': 0.9,
-            'weight_decay': 0
+            'momentum': 0.8,
+            'weight_decay': 1e-7
         }
         write_json(config, f"{PREPROCESSED_ROOT}/{self.dataset_name}/config.json")
 
