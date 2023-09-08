@@ -21,6 +21,16 @@ from PIL import Image
 class CardiacEchoViewPreprocessor(Preprocessor):
     def __init__(self, dataset_id: str, folds: int, processes: int, normalize: bool,
                  csv_path: str, data_root: str):
+        """
+        Cardiac view preprocessor subclass. Transforms data from original format to this pipelines format.
+        Also converts data to 2d slices, and applies movement mask.
+        :param dataset_id: The id of the dataset to use.
+        :param folds: How many folds to make.
+        :param processes: How many processes to use.
+        :param normalize: If we should normalize the data.
+        :param csv_path: The path to the cardiac labeling csv.
+        :param data_root: The root of the cardiac data.
+        """
         super().__init__(dataset_id, folds, processes, normalize)
         assert os.path.exists(csv_path), f"The csv path {csv_path} DNE."
         assert os.path.exists(data_root), f"The data root {data_root} DNE."
@@ -29,35 +39,48 @@ class CardiacEchoViewPreprocessor(Preprocessor):
         self.target_shape = (800, 600)
 
     def process(self) -> None:
+        """
+        Starts the processing of the data on process pool, and calls super version.
+        :return: Nothing
+        """
         self._build_output_folder()
         _, row_series = zip(*self.data_info.iterrows())
-        data = [(row, self.dataset_name, self.data_root, get_case_name_from_number(i)) for i, row in
+        data = [(row, get_case_name_from_number(i)) for i, row in
                 enumerate(row_series)]
-        with Pool(os.cpu_count()) as pool:
+        with Pool(self.processes) as pool:
             pool.map(self._process_case, data)
         super().process()
 
-    def _build_output_folder(self):
+    def _build_output_folder(self) -> None:
+        """
+        Prepares the output folder for usage.
+        :return: Nothing
+        """
         raw_root = f"{DATA_ROOT}/raw/{self.dataset_name}"
         shutil.rmtree(raw_root)
         assert not os.path.exists(raw_root), ("The raw data root already exists. "
                                               "Try a new dataset name, or delete the folder.")
         os.makedirs(raw_root)
 
-    def _process_case(self, data: Tuple[pd.Series, str, str, str]) -> None:
-        row, dataset_name, root_dir, case_name = data
+    def _process_case(self, data: Tuple[pd.Series, str]) -> None:
+        """
+        Processes a single dicom instance.
+        :param data: A tuple containing [panda series from label_csv, the case name to write to]
+        :return: Nothing
+        """
+        row, case_name = data
         if '-D' in row[LABEL]:
             row[LABEL] = row[LABEL].replace('-D', '')
         if row[LABEL] == 'other':
             return
-        output_folder = f"{DATA_ROOT}/raw/{dataset_name}/{row[LABEL]}"
+        output_folder = f"{DATA_ROOT}/raw/{self.dataset_name}/{row[LABEL]}"
         # create the labels folder
         try:
             os.mkdir(output_folder)
         except FileExistsError:
             ...
         # get data
-        data_path = f"{root_dir}/{row[PATIENT_PATH]}/{row[FILE_NAME]}"
+        data_path = f"{self.data_root}/{row[PATIENT_PATH]}/{row[FILE_NAME]}"
         if not os.path.exists(data_path):
             print(f"Skipping {row[PATIENT_PATH]}/{row[FILE_NAME]}. DNE")
             return
@@ -71,6 +94,12 @@ class CardiacEchoViewPreprocessor(Preprocessor):
 
     @staticmethod
     def _apply_movement_mask(image_array: np.array, k:int = 100) -> np.array:
+        """
+        Zeroes image region without movement across zeroth axis.
+        :param image_array: The image in question
+        :param k: How many frames to look across.
+        :return: The masked image.
+        """
         slices, height, width, ch = image_array.shape
 
         mask = np.zeros((height, width, ch), dtype='uint8')
@@ -84,6 +113,11 @@ class CardiacEchoViewPreprocessor(Preprocessor):
 
     @staticmethod
     def _read_dicom(path: str) -> np.array:
+        """
+        Reads image and returns array.
+        :param path: The path to the file to read.
+        :return: The array of the dicom image.
+        """
         return sitk.GetArrayFromImage(sitk.ReadImage(path))
 
 

@@ -264,6 +264,11 @@ def get_dataloaders_from_fold(dataset_name: str, fold: int,
 
 
 def get_case_name_from_number(c: int) -> str:
+    """
+    Given a case number, returns the string name.
+    :param c: The case number.
+    :return: The case name in form case_xxxxx
+    """
     c = str(c)
     zeros = '0' * (5 - len(c))
     return f"case_{zeros}{c}"
