@@ -261,3 +261,9 @@ def get_dataloaders_from_fold(dataset_name: str, fold: int,
     )
 
     return train_dataloader, val_dataloader
+
+
+def get_case_name_from_number(c: int) -> str:
+    c = str(c)
+    zeros = '0' * (5 - len(c))
+    return f"case_{zeros}{c}"
