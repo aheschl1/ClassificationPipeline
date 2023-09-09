@@ -205,11 +205,11 @@ def batch_collate_fn(batch: List[Datapoint]) -> Tuple[torch.Tensor, torch.Tensor
     for point in batch:
         data.append(point.data)
         label = torch.zeros(num_classes)
-        label[point.label] = 1
+        # label[point.label] = 1
         labels.append(label)
         point.clear_data()
 
-    return torch.stack(data), torch.stack(labels), batch
+    return torch.stack(data).pin_memory(), torch.stack(labels).pin_memory(), batch
 
 
 def get_dataloaders_from_fold(dataset_name: str, fold: int,
