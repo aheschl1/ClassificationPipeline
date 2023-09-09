@@ -57,14 +57,6 @@ class PipelineDataset(Dataset):
         point.set_num_classes(self.num_classes)
         return point
 
-    @staticmethod
-    def available_memory() -> float:
-        """
-        Method for getting available memory.
-        :return: Total available memory in bytes.
-        """
-        return psutil.virtual_memory()[1]
-
 
 if __name__ == "__main__":
     print(PipelineDataset.available_memory())
