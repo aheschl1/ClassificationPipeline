@@ -8,7 +8,6 @@ from src.utils.constants import *
 from src.preprocessing.preprocess_entry import Preprocessor
 import shutil
 from typing import Tuple
-
 import SimpleITK as sitk
 import click
 import pandas as pd
@@ -16,6 +15,8 @@ import os
 from multiprocessing.pool import Pool
 import numpy as np
 from PIL import Image
+import uuid
+import glob
 
 
 class CardiacEchoViewPreprocessor(Preprocessor):
@@ -45,10 +46,16 @@ class CardiacEchoViewPreprocessor(Preprocessor):
         """
         self._build_output_folder()
         _, row_series = zip(*self.data_info.iterrows())
-        data = [(row, get_case_name_from_number(i)) for i, row in
+        data = [row for _, row in
                 enumerate(row_series)]
         with Pool(self.processes) as pool:
             pool.map(self._process_case, data)
+        
+        cases = glob.glob(f"{DATA_ROOT}/raw/{self.dataset_name}/**/*.png", recursive=True)
+        for current_case, case in enumerate(cases):
+            case_name = get_case_name_from_number(current_case)
+            shutil.move(case, '/'.join(case.split('/')[0:-1]+[f"{case_name}.png"]))
+
         super().process()
 
     def _build_output_folder(self) -> None:
@@ -62,13 +69,12 @@ class CardiacEchoViewPreprocessor(Preprocessor):
                                               "Try a new dataset name, or delete the folder.")
         os.makedirs(raw_root)
 
-    def _process_case(self, data: Tuple[pd.Series, str]) -> None:
+    def _process_case(self, row: pd.Series) -> None:
         """
         Processes a single dicom instance.
         :param data: A tuple containing [panda series from label_csv, the case name to write to]
         :return: Nothing
         """
-        row, case_name = data
         if '-D' in row[LABEL]:
             row[LABEL] = row[LABEL].replace('-D', '')
         if row[LABEL] == 'other':
@@ -89,7 +95,7 @@ class CardiacEchoViewPreprocessor(Preprocessor):
         data = CardiacEchoViewPreprocessor._apply_movement_mask(data)
         for im_slice in data:
             im_slice = Image.fromarray(im_slice).resize(self.target_shape)
-            im_slice.save(f"{output_folder}/{case_name}.png")
+            im_slice.save(f"{output_folder}/{uuid.uuid4()}.png")
         print(f"Completed {row[PATIENT_PATH]}/{row[FILE_NAME]}!")
 
     @staticmethod

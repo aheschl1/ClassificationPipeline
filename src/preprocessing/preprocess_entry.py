@@ -2,6 +2,7 @@ import sys
 
 # Adds the source to path for imports and stuff
 sys.path.append("/home/andrew.heschl/Documents/ClassificationPipeline")
+sys.path.append("/home/student/andrew/Documents/ClassificationPipeline")
 sys.path.append("/home/andrewheschl/PycharmProjects/classification_pipeline")
 from src.utils.utils import write_json, get_dataset_name_from_id, check_raw_exists, get_raw_datapoints, \
     get_dataloaders_from_fold
@@ -12,7 +13,8 @@ import click
 from typing import Dict, Union, Tuple, Type
 from tqdm import tqdm
 import time
-
+from PIL import ImageFile
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 class Preprocessor:
     def __init__(self, dataset_id: str, folds: int, processes: int, normalize: bool, **kwargs):
