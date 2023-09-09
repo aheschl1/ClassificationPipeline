@@ -206,6 +206,7 @@ def batch_collate_fn(batch: List[Datapoint]) -> Tuple[torch.Tensor, torch.Tensor
         data.append(point.data)
         label = torch.zeros(num_classes)
         # label[point.label] = 1
+        print("warning comment out in collate")
         labels.append(label)
         point.clear_data()
 
