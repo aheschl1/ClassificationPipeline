@@ -50,10 +50,10 @@ class PipelineDataset(Dataset):
         """
         point = self.datapoints[idx]
         point.load_data(store_metadata=self.store_metadata)
+        if not isinstance(point.data, torch.Tensor):
+            point.data = torch.Tensor(point.data)
         if self.transforms is not None:
             point.data = self.transforms(point.data)
-        if not isinstance(point.data, torch.Tensor):
-            point.data = torch.tensor(point.data)
         point.set_num_classes(self.num_classes)
         return point
 

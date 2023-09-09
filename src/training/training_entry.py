@@ -27,7 +27,7 @@ from torch.distributed import init_process_group, destroy_process_group
 import torch.distributed as dist
 import matplotlib.pyplot as plt
 import datetime
-
+from torchvision.transforms import Resize
 
 class LogHelper:
     def __init__(self, output_dir: str) -> None:
@@ -166,8 +166,8 @@ class Trainer:
         This method is responsible for creating the augmentation and then fetching dataloaders.
         :return: Train and val dataloaders.
         """
-        train_transforms = None
-        val_transforms = None
+        train_transforms = Resize((256, 256))
+        val_transforms = Resize((256, 256))
         return get_dataloaders_from_fold(
             self.dataset_name,
             self.fold,
