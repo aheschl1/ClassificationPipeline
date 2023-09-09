@@ -7,7 +7,6 @@ from src.utils.utils import get_case_name_from_number
 from src.utils.constants import *
 from src.preprocessing.preprocess_entry import Preprocessor
 import shutil
-from typing import Tuple
 import SimpleITK as sitk
 import click
 import pandas as pd
@@ -42,6 +41,7 @@ class CardiacEchoViewPreprocessor(Preprocessor):
     def process(self) -> None:
         """
         Starts the processing of the data on process pool, and calls super version.
+        Starts by naming the dta randomly, and then renames files to proper format.
         :return: Nothing
         """
         self._build_output_folder()
@@ -72,7 +72,6 @@ class CardiacEchoViewPreprocessor(Preprocessor):
     def _process_case(self, row: pd.Series) -> None:
         """
         Processes a single dicom instance.
-        :param data: A tuple containing [panda series from label_csv, the case name to write to]
         :return: Nothing
         """
         if '-D' in row[LABEL]:
