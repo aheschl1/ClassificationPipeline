@@ -29,6 +29,7 @@ import matplotlib.pyplot as plt
 import datetime
 from torchvision.transforms import Resize
 
+
 class LogHelper:
     def __init__(self, output_dir: str) -> None:
         """
@@ -98,7 +99,8 @@ class Trainer:
                  gpu_id: int,
                  unique_folder_name: str,
                  config_name: str,
-                 checkpoint_name: str = None):
+                 checkpoint_name: str = None,
+                 preload: bool = True):
         """
         Trainer class for training and checkpointing of networks.
         :param dataset_name: The name of the dataset to use.
@@ -109,6 +111,7 @@ class Trainer:
         :param checkpoint_name: None if we should train from scratch, otherwise the model weights that should be used.
         """
         assert torch.cuda.is_available(), "This pipeline only supports GPU training. No GPU was detected, womp womp."
+        self.preload = preload
         self.dataset_name = dataset_name
         self.fold = fold
         self.save_latest = save_latest
@@ -173,7 +176,8 @@ class Trainer:
             self.fold,
             train_transforms=train_transforms,
             val_transforms=val_transforms,
-            sampler=DistributedSampler
+            sampler=DistributedSampler,
+            preload=self.preload
         )
 
     def _train_single_epoch(self) -> float:
@@ -280,7 +284,7 @@ class Trainer:
                 self.save_model_weights('best')
             epoch_end_time = time.time()
             if self.device == 0:
-                log(f"Process {self.device} took {epoch_end_time-epoch_start_time} seconds.")
+                log(f"Process {self.device} took {epoch_end_time - epoch_start_time} seconds.")
 
         # Now training is completed, print some stuff
         dist.barrier()
@@ -417,9 +421,11 @@ def setup_ddp(rank: int, world_size: int) -> None:
 
 
 def ddp_training(rank, world_size: int, dataset_id: int,
-                 fold: int, save_latest: bool, model: str, session_id: str, load_weights: str, config: str) -> None:
+                 fold: int, save_latest: bool, model: str,
+                 session_id: str, load_weights: str, config: str, preload: bool) -> None:
     """
     Launches training on a single process using pytorch ddp.
+    :param preload:
     :param config: The name of the config to load.
     :param session_id: Session id to be used for folder name on output.
     :param rank: The rank we are starting.
@@ -433,7 +439,8 @@ def ddp_training(rank, world_size: int, dataset_id: int,
     """
     setup_ddp(rank, world_size)
     dataset_name = get_dataset_name_from_id(dataset_id)
-    trainer = Trainer(dataset_name, fold, save_latest, model, rank, session_id, config, load_weights)
+    trainer = Trainer(dataset_name, fold, save_latest, model, rank, session_id, config,
+                      checkpoint_name=load_weights, preload=preload)
     trainer.train()
     destroy_process_group()
 
@@ -449,6 +456,7 @@ def ddp_training(rank, world_size: int, dataset_id: int,
 @click.option('--gpus', '-g', help='How many gpus for ddp', type=int, default=1)
 @click.option('--load_weights', '-l', help='Weights to continue training with', type=str, default=None)
 @click.option('-config', '-c', help='Name of the config file to utilize.', type=str, default='config')
+@click.option('--preload', '--p', help='Should the datasets preload.', is_flag=True, type=bool)
 def main(fold: int,
          dataset_id: str,
          model: str,
@@ -456,9 +464,11 @@ def main(fold: int,
          state: str,
          gpus: int,
          load_weights: str,
-         config: str) -> None:
+         config: str,
+         preload: bool) -> None:
     """
     Initializes training on multiple processes, and initializes logger.
+    :param preload: Should datasets preload
     :param config: The name oof the config file to load.
     :param gpus: How many gpus to train with
     :param state: 2d or 3d module state
@@ -479,7 +489,7 @@ def main(fold: int,
 
     mp.spawn(
         ddp_training,
-        args=(gpus, dataset_id, fold, save_latest, model, session_id, load_weights, config),
+        args=(gpus, dataset_id, fold, save_latest, model, session_id, load_weights, config, preload),
         nprocs=gpus
     )
 

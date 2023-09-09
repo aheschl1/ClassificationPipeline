@@ -14,7 +14,9 @@ from typing import Dict, Union, Tuple, Type
 from tqdm import tqdm
 import time
 from PIL import ImageFile
+
 ImageFile.LOAD_TRUNCATED_IMAGES = True
+
 
 class Preprocessor:
     def __init__(self, dataset_id: str, folds: int, processes: int, normalize: bool, **kwargs):
@@ -134,7 +136,8 @@ class Preprocessor:
                                                              preprocessed_data=False,
                                                              batch_size=1,
                                                              shuffle=False,
-                                                             store_metadata=True
+                                                             store_metadata=True,
+                                                             preload=False
                                                              )
         # prep dirs
         os.mkdir(f"{PREPROCESSED_ROOT}/{self.dataset_name}/fold_{fold}")

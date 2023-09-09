@@ -202,12 +202,11 @@ def batch_collate_fn(batch: List[Datapoint]) -> Tuple[torch.Tensor, torch.Tensor
     num_classes = batch[0].num_classes
     assert num_classes is not None, "All datapoints should have the property " \
                                     "num_classes set before collate_fn. womp womp"
-    for point in batch:
-        data.append(point.data)
+    for data_point, point in batch:
+        data.append(data_point)
         label = torch.zeros(num_classes)
         label[point.label] = 1
         labels.append(label)
-        point.clear_data()
 
     return torch.stack(data).pin_memory(), torch.stack(labels).pin_memory(), batch
 
@@ -216,9 +215,11 @@ def get_dataloaders_from_fold(dataset_name: str, fold: int,
                               train_transforms=None, val_transforms=None,
                               preprocessed_data: bool = True,
                               store_metadata: bool = False,
+                              preload: bool = True,
                               **kwargs) -> Tuple[DataLoader, DataLoader]:
     """
     Returns the train and val dataloaders for a specific dataset fold.
+    :param preload: Weather or not the datasets should preload images.
     :param dataset_name: The name of the dataset.
     :param fold: The fold to grab.
     :param train_transforms: The transforms to apply to training data.
@@ -234,8 +235,8 @@ def get_dataloaders_from_fold(dataset_name: str, fold: int,
                                                            fold) \
         if preprocessed_data else get_raw_datapoints_folded(dataset_name, fold)
 
-    train_dataset = PipelineDataset(train_points, train_transforms, store_metadata=store_metadata)
-    val_dataset = PipelineDataset(val_points, val_transforms, store_metadata=store_metadata)
+    train_dataset = PipelineDataset(train_points, train_transforms, store_metadata=store_metadata, preload=preload)
+    val_dataset = PipelineDataset(val_points, val_transforms, store_metadata=store_metadata, preload=preload)
     train_sampler, val_sampler = None, None
     if 'sampler' in kwargs:
         train_sampler = kwargs['sampler'](train_dataset)

@@ -1,10 +1,10 @@
-from typing import List, Callable
+from typing import List, Callable, Tuple
 
 import torch
 from torch.utils.data import Dataset
+from tqdm import tqdm
 
 from src.dataloading.datapoint import Datapoint
-import psutil
 
 
 class PipelineDataset(Dataset):
@@ -12,7 +12,8 @@ class PipelineDataset(Dataset):
     def __init__(self,
                  datapoints: List[Datapoint],
                  transforms: Callable = None,
-                 store_metadata: bool = False
+                 store_metadata: bool = False,
+                 preload=True
                  ):
         """
         Custom dataset for this pipeline.
@@ -24,6 +25,15 @@ class PipelineDataset(Dataset):
         self.transforms = transforms
         self.store_metadata = store_metadata
         self.num_classes = self._get_number_of_classes()
+        self.preload = preload
+        self.preloaded = []
+        self._maybe_preload_data()
+
+    def _maybe_preload_data(self) -> None:
+        if not self.preload:
+            return
+        for point in tqdm(self.datapoints, desc="Preloading data"):
+            self.preloaded.append((point.get_data(store_metadata=self.store_metadata), point))
 
     def _get_number_of_classes(self):
         """
@@ -42,21 +52,20 @@ class PipelineDataset(Dataset):
         """
         return len(self.datapoints)
 
-    def __getitem__(self, idx) -> Datapoint:
+    def __getitem__(self, idx) -> Tuple[torch.Tensor, Datapoint]:
         """
         Loads the data from the index and transforms it.
         :param idx: The data to grab
         :return: The loaded datapoint
         """
-        point = self.datapoints[idx]
-        point.load_data(store_metadata=self.store_metadata)
-        if not isinstance(point.data, torch.Tensor):
-            point.data = torch.Tensor(point.data)
+        if not self.preload:
+            point = self.datapoints[idx]
+            data = point.get_data(store_metadata=self.store_metadata)
+        else:
+            data, point = self.preloaded[idx]
+        if not isinstance(data, torch.Tensor):
+            data = torch.Tensor(data)
         if self.transforms is not None:
-            point.data = self.transforms(point.data)
+            data = self.transforms(data)
         point.set_num_classes(self.num_classes)
-        return point
-
-
-if __name__ == "__main__":
-    print(PipelineDataset.available_memory())
+        return data, point

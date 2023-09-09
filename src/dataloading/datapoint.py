@@ -24,17 +24,10 @@ class Datapoint:
             self.normalizer = get_normalizer_from_extension(self.extension)
         self.reader_writer = self.reader_writer(case_name=case_name, dataset_name=dataset_name)
         self._case_name = case_name
-        self.data = None
         self.num_classes = None
 
     def get_data(self, **kwargs) -> np.array:
         return self.reader_writer.read(self.path, **kwargs)
-
-    def load_data(self, **kwargs) -> np.array:
-        self.data = self.reader_writer.read(self.path, **kwargs)
-
-    def clear_data(self):
-        self.data = None
 
     def set_num_classes(self, n: int) -> None:
         self.num_classes = n

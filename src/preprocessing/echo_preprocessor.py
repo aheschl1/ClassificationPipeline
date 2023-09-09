@@ -50,11 +50,11 @@ class CardiacEchoViewPreprocessor(Preprocessor):
                 enumerate(row_series)]
         with Pool(self.processes) as pool:
             pool.map(self._process_case, data)
-        
+        # rename cases to be correct
         cases = glob.glob(f"{DATA_ROOT}/raw/{self.dataset_name}/**/*.png", recursive=True)
         for current_case, case in enumerate(cases):
             case_name = get_case_name_from_number(current_case)
-            shutil.move(case, '/'.join(case.split('/')[0:-1]+[f"{case_name}.png"]))
+            shutil.move(case, '/'.join(case.split('/')[0:-1] + [f"{case_name}.png"]))
 
         super().process()
 
@@ -98,7 +98,7 @@ class CardiacEchoViewPreprocessor(Preprocessor):
         print(f"Completed {row[PATIENT_PATH]}/{row[FILE_NAME]}!")
 
     @staticmethod
-    def _apply_movement_mask(image_array: np.array, k:int = 100) -> np.array:
+    def _apply_movement_mask(image_array: np.array, k: int = 100) -> np.array:
         """
         Zeroes image region without movement across zeroth axis.
         :param image_array: The image in question
