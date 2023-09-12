@@ -64,7 +64,7 @@ class PipelineDataset(Dataset):
         else:
             data, point = self.preloaded[idx]
         if not isinstance(data, torch.Tensor):
-            data = torch.Tensor(data)
+            data = torch.from_numpy(data)
         if self.transforms is not None:
             data = self.transforms(data)
         point.set_num_classes(self.num_classes)

@@ -1,18 +1,21 @@
 {
     "LogKwargs": {
-        "backbone": "EfficientNetb6"
+        "backbone": "FCN"
     },
-    "Tag": "efficientnet-b6",
+    "Tag": "FCN",
     "Children": [
         {
-            "ComponentClass": "enb6",
+            "ComponentClass": "Flatten",
             "args": {
-                "weights": "EfficientNet_B6_Weights.IMAGENET1K_V1"
+                "start_dim":1
             }
         },
         {
-            "ComponentClass": "Flatten",
-            "args": {}
+            "ComponentClass": "Linear",
+            "args": {
+                "in_features": 786432,
+                "out_features": 1000
+            }
         },
         {
             "ComponentClass":"ReLU",
@@ -22,7 +25,7 @@
             "ComponentClass": "Linear",
             "args": {
                 "in_features": 1000,
-                "out_features": 256
+                "out_features": 100
             }
         },
         {
@@ -32,7 +35,7 @@
         {
             "ComponentClass": "Linear",
             "args": {
-                "in_features": 256,
+                "in_features": 100,
                 "out_features": 10
             }
         }

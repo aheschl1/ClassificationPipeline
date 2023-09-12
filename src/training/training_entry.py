@@ -154,8 +154,7 @@ class Trainer:
         :return: str which is the output directory.
         """
         output_dir = f"{RESULTS_ROOT}/{self.dataset_name}/fold_{self.fold}/{session_id}"
-        if self.device == 0:
-            os.makedirs(output_dir)
+        os.makedirs(output_dir, exist_ok=True)
         logging.basicConfig(
             level=logging.INFO,
             filename=f"{output_dir}/logs.txt"
@@ -171,6 +170,7 @@ class Trainer:
         """
         train_transforms = Resize(self.config['target_size'], antialias=True)
         val_transforms = Resize(self.config['target_size'], antialias=True)
+        self.train_transforms = train_transforms
         return get_dataloaders_from_fold(
             self.dataset_name,
             self.fold,
@@ -338,14 +338,10 @@ class Trainer:
             :return: None
             """
             log(f"Generating onnx model for visualization and to verify model sanity...\n")
-            dummy_input = torch.randn(1, *self.data_shape, device=torch.device(self.device))
-            input_names = ["actual_input_1"] + ["learned_%d" % i for i in range(16)]
-            output_names = ["output1"]
+            dummy_input = self.train_transforms(torch.randn(1, *self.data_shape, device=torch.device(self.device)))
             file = f"{self.output_dir}/model_topology.onnx"
             torch.onnx.export(model, dummy_input, file,
-                              verbose=False,
-                              input_names=input_names,
-                              output_names=output_names)
+                              verbose=False)
             log(f"Saved onnx model to {file}. Architecture works!")
             log(f"Go to https://netron.app/ to view the architecture.")
             log(self.seperator)
