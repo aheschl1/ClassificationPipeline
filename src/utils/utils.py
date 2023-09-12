@@ -199,16 +199,18 @@ def batch_collate_fn(batch: List[Datapoint]) -> Tuple[torch.Tensor, torch.Tensor
     """
     data = []
     labels = []
-    num_classes = batch[0].num_classes
+    num_classes = batch[0][1].num_classes
+    points = []
     assert num_classes is not None, "All datapoints should have the property " \
                                     "num_classes set before collate_fn. womp womp"
     for data_point, point in batch:
         data.append(data_point)
+        points.append(point)
         label = torch.zeros(num_classes)
         label[point.label] = 1
         labels.append(label)
 
-    return torch.stack(data).pin_memory(), torch.stack(labels).pin_memory(), batch
+    return torch.stack(data), torch.stack(labels), points
 
 
 def get_dataloaders_from_fold(dataset_name: str, fold: int,

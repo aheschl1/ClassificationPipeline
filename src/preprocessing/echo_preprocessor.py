@@ -11,12 +11,14 @@ import SimpleITK as sitk
 import click
 import pandas as pd
 import os
-from multiprocessing.pool import Pool
+from multiprocessing.pool import ThreadPool
 import numpy as np
 from PIL import Image
 import uuid
 import glob
-
+from typing import Dict
+from sklearn.model_selection import train_test_split
+from overrides import override
 
 class CardiacEchoViewPreprocessor(Preprocessor):
     def __init__(self, dataset_id: str, folds: int, processes: int, normalize: bool,
@@ -36,8 +38,11 @@ class CardiacEchoViewPreprocessor(Preprocessor):
         assert os.path.exists(data_root), f"The data root {data_root} DNE."
         self.data_info = pd.read_excel(csv_path)
         self.data_root = data_root
+        self.case_grouping = []
+        self.uuid_case_mapping = None
         self.target_shape = (800, 600)
 
+    @override
     def process(self) -> None:
         """
         Starts the processing of the data on process pool, and calls super version.
@@ -48,15 +53,50 @@ class CardiacEchoViewPreprocessor(Preprocessor):
         _, row_series = zip(*self.data_info.iterrows())
         data = [row for _, row in
                 enumerate(row_series)]
-        with Pool(self.processes) as pool:
+        with ThreadPool(self.processes) as pool:
             pool.map(self._process_case, data)
         # rename cases to be correct
         cases = glob.glob(f"{DATA_ROOT}/raw/{self.dataset_name}/**/*.png", recursive=True)
-        for current_case, case in enumerate(cases):
+        uuid_case_mapping = {}
+        for current_case, path in enumerate(cases):
             case_name = get_case_name_from_number(current_case)
-            shutil.move(case, '/'.join(case.split('/')[0:-1] + [f"{case_name}.png"]))
-
+            old_id = path.split('/')[-1].split('.')[0]
+            uuid_case_mapping[old_id] = case_name
+            shutil.move(path, '/'.join(path.split('/')[0:-1] + [f"{case_name}.png"]))
+        self.uuid_case_mapping = uuid_case_mapping
         super().process()
+    
+    @override
+    def get_folds(self, k: int) -> Dict[int, Dict[str, list]]:
+        """
+        Gets random fold at 80/20 split. Returns in a map.
+        :param k: How many folds for kfold cross validation.
+        :return: Folds map
+        """
+        assert k == 1, "Echo preprocessor can only do one fold right now. The dev sucked too much"
+        train_groups, test_groups = train_test_split(self.case_grouping)
+        train_cases, val_cases = [], []
+        for group in train_groups:
+            for case in group:
+                train_cases.append(self.uuid_case_mapping[case])
+        for group in test_groups:
+            for case in group:
+                val_cases.append(self.uuid_case_mapping[case])
+        return {
+            0: {
+                "train": train_cases,
+                "val": val_cases
+            }
+        }
+    
+    @override
+    def assert_all_images_same_shape(self) -> None:
+        """
+        Ensures that all datapoints have the same shape.
+        Overwritten because we reshape in this subclass.
+        :return:
+        """
+        ...
 
     def _build_output_folder(self) -> None:
         """
@@ -76,8 +116,6 @@ class CardiacEchoViewPreprocessor(Preprocessor):
         """
         if '-D' in row[LABEL]:
             row[LABEL] = row[LABEL].replace('-D', '')
-        if row[LABEL] == 'other':
-            return
         output_folder = f"{DATA_ROOT}/raw/{self.dataset_name}/{row[LABEL]}"
         # create the labels folder
         try:
@@ -92,9 +130,13 @@ class CardiacEchoViewPreprocessor(Preprocessor):
         print(f"Working on {row[PATIENT_PATH]}/{row[FILE_NAME]}")
         data = CardiacEchoViewPreprocessor._read_dicom(data_path)
         data = CardiacEchoViewPreprocessor._apply_movement_mask(data)
+        case_group = []
         for im_slice in data:
+            case_id = uuid.uuid4()
+            case_group.append(str(case_id))
             im_slice = Image.fromarray(im_slice).resize(self.target_shape)
-            im_slice.save(f"{output_folder}/{uuid.uuid4()}.png")
+            im_slice.save(f"{output_folder}/{case_id}.png")
+        self.case_grouping.append(case_group)
         print(f"Completed {row[PATIENT_PATH]}/{row[FILE_NAME]}!")
 
     @staticmethod

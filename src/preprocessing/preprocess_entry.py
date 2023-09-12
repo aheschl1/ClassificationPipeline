@@ -5,7 +5,7 @@ sys.path.append("/home/andrew.heschl/Documents/ClassificationPipeline")
 sys.path.append("/home/student/andrew/Documents/ClassificationPipeline")
 sys.path.append("/home/andrewheschl/PycharmProjects/classification_pipeline")
 from src.utils.utils import write_json, get_dataset_name_from_id, check_raw_exists, get_raw_datapoints, \
-    get_dataloaders_from_fold
+    get_dataloaders_from_fold, read_json
 from src.preprocessing.utils import maybe_make_preprocessed, get_labels_from_raw
 from src.utils.constants import *
 from src.preprocessing.splitting import Splitter
@@ -70,9 +70,12 @@ class Preprocessor:
             'lr': 0.01,
             'epochs': 10,
             'momentum': 0.8,
-            'weight_decay': 1e-7
+            'weight_decay': 1e-7,
+            'target_size': [512, 512]
         }
         write_json(config, f"{PREPROCESSED_ROOT}/{self.dataset_name}/config.json")
+    #python preprocess_entry.py -folds 1 -p 60 --n -d 4 -preprocessor base -cardiac_data_root /home/student/andrew/Documents/Dataset/Cardiac/newecho -cardiac_csv_path /home/student/andrew/Documents/Dataset/Cardiac/label_mapping.xlsx
+    #python training_entry.py -f 0 -d 4 -m /home/student/andrew/Documents/ClassificationPipeline/models/test2.json -g 2
 
     def assert_all_images_same_shape(self) -> None:
         """
@@ -144,8 +147,8 @@ class Preprocessor:
         os.mkdir(f"{PREPROCESSED_ROOT}/{self.dataset_name}/fold_{fold}/train")
         os.mkdir(f"{PREPROCESSED_ROOT}/{self.dataset_name}/fold_{fold}/val")
         # start saving preprocessed stuff
-        train_normalize_loader = train_loader.dataset[0].normalizer(train_loader, active=self.normalize)
-        val_normalize_loader = (val_loader.dataset[0]
+        train_normalize_loader = train_loader.dataset[0][1].normalizer(train_loader, active=self.normalize)
+        val_normalize_loader = (val_loader.dataset[0][1]
                                 .normalizer(val_loader, active=self.normalize, calculate_early=False))
         val_normalize_loader.sync(train_normalize_loader)
 

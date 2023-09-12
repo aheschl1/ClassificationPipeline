@@ -169,8 +169,8 @@ class Trainer:
         This method is responsible for creating the augmentation and then fetching dataloaders.
         :return: Train and val dataloaders.
         """
-        train_transforms = Resize((512, 512), antialias=True)
-        val_transforms = Resize((512, 512), antialias=True)
+        train_transforms = Resize(self.config['target_size'], antialias=True)
+        val_transforms = Resize(self.config['target_size'], antialias=True)
         return get_dataloaders_from_fold(
             self.dataset_name,
             self.fold,
