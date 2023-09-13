@@ -241,8 +241,10 @@ def get_dataloaders_from_fold(dataset_name: str, fold: int,
     val_dataset = PipelineDataset(val_points, val_transforms, store_metadata=store_metadata, preload=preload)
     train_sampler, val_sampler = None, None
     if 'sampler' in kwargs:
-        train_sampler = kwargs['sampler'](train_dataset)
-        val_sampler = kwargs['sampler'](val_dataset)
+        assert 'rank' in kwargs and 'world_size' in kwargs, \
+            "If supplying 'sampler' you must also supply 'world_size' and 'rank'"
+        train_sampler = kwargs['sampler'](train_dataset, rank=kwargs['rank'], num_replicas=kwargs['world_size'], shuffle=True)
+        val_sampler = kwargs['sampler'](val_dataset, rank=kwargs['rank'], num_replicas=kwargs['world_size'], shuffle=False)
 
     train_dataloader = DataLoader(
         train_dataset,

@@ -30,6 +30,23 @@ import datetime
 from torchvision.transforms import Resize
 
 
+import sys
+import pdb
+
+class ForkedPdb(pdb.Pdb):
+    """A Pdb subclass that may be used
+    from a forked multiprocessing child
+
+    """
+    def interaction(self, *args, **kwargs):
+        _stdin = sys.stdin
+        try:
+            sys.stdin = open('/dev/stdin')
+            pdb.Pdb.interaction(self, *args, **kwargs)
+        finally:
+            sys.stdin = _stdin
+
+
 class LogHelper:
     def __init__(self, output_dir: str) -> None:
         """
@@ -100,7 +117,8 @@ class Trainer:
                  unique_folder_name: str,
                  config_name: str,
                  checkpoint_name: str = None,
-                 preload: bool = True):
+                 preload: bool = True,
+                 world_size:int = 1):
         """
         Trainer class for training and checkpointing of networks.
         :param dataset_name: The name of the dataset to use.
@@ -114,6 +132,7 @@ class Trainer:
         self.preload = preload
         self.dataset_name = dataset_name
         self.fold = fold
+        self.world_size = world_size
         self.save_latest = save_latest
         self.device = gpu_id
         self.output_dir = self._prepare_output_directory(unique_folder_name)
@@ -177,7 +196,9 @@ class Trainer:
             train_transforms=train_transforms,
             val_transforms=val_transforms,
             sampler=DistributedSampler,
-            preload=self.preload
+            preload=self.preload,
+            rank=self.device,
+            world_size=self.world_size
         )
 
     def _train_single_epoch(self) -> float:
@@ -187,11 +208,13 @@ class Trainer:
         """
         running_loss = 0.
         total_items = 0
+        # ForkedPdb().set_trace()
         for data, labels, _ in self.train_dataloader:
             self.optim.zero_grad()
             data = data.to(self.device)
             labels = labels.to(self.device)
             batch_size = data.shape[0]
+            # ForkedPdb().set_trace()
             # do prediction and calculate loss
             predictions = self.model(data)
             loss = self.loss(predictions, labels)
@@ -253,6 +276,7 @@ class Trainer:
         last_val_accuracy = 0
         for epoch in range(epochs):
             # epoch timing
+            # ForkedPdb().set_trace()
             epoch_start_time = time.time()
             self.train_dataloader.sampler.set_epoch(epoch)
             self.val_dataloader.sampler.set_epoch(epoch)
@@ -435,7 +459,7 @@ def ddp_training(rank, world_size: int, dataset_id: int,
     setup_ddp(rank, world_size)
     dataset_name = get_dataset_name_from_id(dataset_id)
     trainer = Trainer(dataset_name, fold, save_latest, model, rank, session_id, config,
-                      checkpoint_name=load_weights, preload=preload)
+                      checkpoint_name=load_weights, preload=preload, world_size=world_size)
     trainer.train()
     destroy_process_group()
 
