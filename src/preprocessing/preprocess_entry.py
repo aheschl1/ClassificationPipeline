@@ -149,11 +149,12 @@ class Preprocessor:
         val_normalize_loader = val_loader.dataset[0][1] \
             .normalizer(val_loader, active=self.normalize, calculate_early=False)
         val_normalize_loader.sync(train_normalize_loader)
-        mean_json = {
-            "mean": train_normalize_loader.mean,
-            "std": train_normalize_loader.std
-        }
-        write_json(mean_json, f"{PREPROCESSED_ROOT}/{self.dataset_name}/fold_{fold}/mean_std.json")
+        if train_normalize_loader.mean is not None:
+            mean_json = {
+                "mean": train_normalize_loader.mean,
+                "std": train_normalize_loader.std
+            }
+            write_json(mean_json, f"{PREPROCESSED_ROOT}/{self.dataset_name}/fold_{fold}/mean_std.json")
 
         for _set in ['train', 'val']:
             for data, labels, points in \
