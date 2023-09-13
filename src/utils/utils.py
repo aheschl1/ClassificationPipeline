@@ -191,7 +191,7 @@ def get_label_case_mapping_from_dataset(dataset_name: str) -> Dict:
     return read_json(path)
 
 
-def batch_collate_fn(batch: List[Datapoint]) -> Tuple[torch.Tensor, torch.Tensor, List[Datapoint]]:
+def batch_collate_fn(batch: List[Tuple[torch.Tensor, Datapoint]]) -> Tuple[torch.Tensor, torch.Tensor, List[Datapoint]]:
     """
     Combines data fetched by dataloader into proper format.
     :param batch: List of data points from loader.

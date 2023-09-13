@@ -340,8 +340,7 @@ class Trainer:
             log(f"Generating onnx model for visualization and to verify model sanity...\n")
             dummy_input = self.train_transforms(torch.randn(1, *self.data_shape, device=torch.device(self.device)))
             file = f"{self.output_dir}/model_topology.onnx"
-            torch.onnx.export(model, dummy_input, file,
-                              verbose=False)
+            torch.onnx.export(model, dummy_input, file, verbose=False)
             log(f"Saved onnx model to {file}. Architecture works!")
             log(f"Go to https://netron.app/ to view the architecture.")
             log(self.seperator)

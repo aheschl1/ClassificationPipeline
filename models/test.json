@@ -35,7 +35,7 @@
             "ComponentClass": "Linear",
             "args": {
                 "in_features": 256,
-                "out_features": 3
+                "out_features": 10
             }
         }
     ]

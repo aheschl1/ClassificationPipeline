@@ -20,6 +20,7 @@ from typing import Dict
 from sklearn.model_selection import train_test_split
 from overrides import override
 
+
 class CardiacEchoViewPreprocessor(Preprocessor):
     def __init__(self, dataset_id: str, folds: int, processes: int, normalize: bool,
                  csv_path: str, data_root: str):
@@ -65,7 +66,7 @@ class CardiacEchoViewPreprocessor(Preprocessor):
             shutil.move(path, '/'.join(path.split('/')[0:-1] + [f"{case_name}.png"]))
         self.uuid_case_mapping = uuid_case_mapping
         super().process()
-    
+
     @override
     def get_folds(self, k: int) -> Dict[int, Dict[str, list]]:
         """
@@ -88,7 +89,7 @@ class CardiacEchoViewPreprocessor(Preprocessor):
                 "val": val_cases
             }
         }
-    
+
     @override
     def assert_all_images_same_shape(self) -> None:
         """

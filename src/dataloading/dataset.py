@@ -13,7 +13,7 @@ class PipelineDataset(Dataset):
                  datapoints: List[Datapoint],
                  transforms: Callable = None,
                  store_metadata: bool = False,
-                 preload=True
+                 preload=False
                  ):
         """
         Custom dataset for this pipeline.
