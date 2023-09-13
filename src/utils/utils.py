@@ -5,7 +5,6 @@ from typing import Dict, List, Union, Tuple
 
 import torch
 from torch.utils.data import DataLoader
-
 from src.dataloading.datapoint import Datapoint
 from src.dataloading.dataset import PipelineDataset
 from src.utils.constants import PREPROCESSED_ROOT, RAW_ROOT
@@ -249,9 +248,9 @@ def get_dataloaders_from_fold(dataset_name: str, fold: int,
     train_dataloader = DataLoader(
         train_dataset,
         batch_size=kwargs.get('batch_size', config['batch_size']),
-        num_workers=kwargs.get('processes', config['processes']),
+        num_workers=0,
         shuffle=train_sampler is None,
-        pin_memory=True,
+        pin_memory=False,
         collate_fn=batch_collate_fn,
         sampler=train_sampler
     )
@@ -259,9 +258,9 @@ def get_dataloaders_from_fold(dataset_name: str, fold: int,
     val_dataloader = DataLoader(
         val_dataset,
         batch_size=kwargs.get('batch_size', config['batch_size']),
-        num_workers=kwargs.get('processes', config['processes']),
+        num_workers=0,
         shuffle=False,
-        pin_memory=True,
+        pin_memory=False,
         collate_fn=batch_collate_fn,
         sampler=val_sampler
     )

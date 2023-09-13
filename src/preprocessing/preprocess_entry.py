@@ -151,8 +151,8 @@ class Preprocessor:
         val_normalize_loader.sync(train_normalize_loader)
         if train_normalize_loader.mean is not None:
             mean_json = {
-                "mean": train_normalize_loader.mean,
-                "std": train_normalize_loader.std
+                "mean": train_normalize_loader.mean.tolist(),
+                "std": train_normalize_loader.std.tolist()
             }
             write_json(mean_json, f"{PREPROCESSED_ROOT}/{self.dataset_name}/fold_{fold}/mean_std.json")
 
