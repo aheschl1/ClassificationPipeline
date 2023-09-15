@@ -242,8 +242,10 @@ def get_dataloaders_from_fold(dataset_name: str, fold: int,
     if 'sampler' in kwargs:
         assert 'rank' in kwargs and 'world_size' in kwargs, \
             "If supplying 'sampler' you must also supply 'world_size' and 'rank'"
-        train_sampler = kwargs['sampler'](train_dataset, rank=kwargs['rank'], num_replicas=kwargs['world_size'], shuffle=True)
-        val_sampler = kwargs['sampler'](val_dataset, rank=kwargs['rank'], num_replicas=kwargs['world_size'], shuffle=False)
+        train_sampler = kwargs['sampler'](train_dataset, rank=kwargs['rank'],
+                                          num_replicas=kwargs['world_size'], shuffle=True)
+        val_sampler = kwargs['sampler'](val_dataset, rank=kwargs['rank'],
+                                        num_replicas=kwargs['world_size'], shuffle=False)
 
     train_dataloader = DataLoader(
         train_dataset,
