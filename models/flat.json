@@ -13,7 +13,7 @@
         {
             "ComponentClass": "Linear",
             "args": {
-                "in_features": 786432,
+                "in_features": 750000,
                 "out_features": 1000
             }
         },
