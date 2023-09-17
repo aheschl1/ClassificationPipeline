@@ -239,7 +239,7 @@ def get_dataloaders_from_fold(dataset_name: str, fold: int,
     train_dataset = PipelineDataset(train_points, train_transforms, store_metadata=store_metadata, preload=preload)
     val_dataset = PipelineDataset(val_points, val_transforms, store_metadata=store_metadata, preload=preload)
     train_sampler, val_sampler = None, None
-    if 'sampler' in kwargs:
+    if 'sampler' in kwargs and kwargs['sampler'] is not None:
         assert 'rank' in kwargs and 'world_size' in kwargs, \
             "If supplying 'sampler' you must also supply 'world_size' and 'rank'"
         train_sampler = kwargs['sampler'](train_dataset, rank=kwargs['rank'],
@@ -250,7 +250,7 @@ def get_dataloaders_from_fold(dataset_name: str, fold: int,
     train_dataloader = DataLoader(
         train_dataset,
         batch_size=kwargs.get('batch_size', config['batch_size']),
-        num_workers=config['processes'],
+        num_workers=(0 if train_sampler is not None else config['processes']),
         shuffle=train_sampler is None,
         pin_memory=False,
         collate_fn=batch_collate_fn,
@@ -260,7 +260,7 @@ def get_dataloaders_from_fold(dataset_name: str, fold: int,
     val_dataloader = DataLoader(
         val_dataset,
         batch_size=kwargs.get('batch_size', config['batch_size']),
-        num_workers=config['processes'],
+        num_workers=(0 if train_sampler is not None else config['processes']),
         shuffle=False,
         pin_memory=False,
         collate_fn=batch_collate_fn,

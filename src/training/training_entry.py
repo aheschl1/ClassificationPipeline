@@ -147,13 +147,15 @@ class Trainer:
         # Start on important stuff here
         self.train_dataloader, self.val_dataloader = self._get_dataloaders()
         self.model = self._get_model(model_path)
-        self.model = DDP(self.model, device_ids=[gpu_id])
+        if self.world_size > 1:
+            self.model = DDP(self.model, device_ids=[gpu_id])
         if checkpoint_name is not None:
             self._load_checkpoint(checkpoint_name)
         self.loss = self._get_loss()
         self.optim = self._get_optim()
         log(f"Trainer finished initialized on rank {gpu_id}.")
-        dist.barrier()
+        if self.world_size > 1:
+            dist.barrier()
 
     def _assert_preprocess_ready_for_train(self) -> None:
         """
@@ -195,7 +197,7 @@ class Trainer:
             self.fold,
             train_transforms=train_transforms,
             val_transforms=val_transforms,
-            sampler=DistributedSampler,
+            sampler=(None if self.world_size == 1 else DistributedSampler),
             preload=self.preload,
             rank=self.device,
             world_size=self.world_size
@@ -212,7 +214,7 @@ class Trainer:
         for data, labels, _ in self.train_dataloader:
             self.optim.zero_grad()
             data = data.to(self.device)
-            labels = labels.to(self.device)
+            labels = labels.to(self.device, non_blocking=True)
             batch_size = data.shape[0]
             # ForkedPdb().set_trace()
             # do prediction and calculate loss
@@ -250,7 +252,7 @@ class Trainer:
         total_items = 0
         for data, labels, _ in self.val_dataloader:
             data = data.to(self.device)
-            labels = labels.to(self.device)
+            labels = labels.to(self.device, non_blocking=True)
             batch_size = data.shape[0]
             # do prediction and calculate loss
             predictions = self.model(data)
@@ -278,8 +280,9 @@ class Trainer:
             # epoch timing
             # ForkedPdb().set_trace()
             epoch_start_time = time.time()
-            self.train_dataloader.sampler.set_epoch(epoch)
-            self.val_dataloader.sampler.set_epoch(epoch)
+            if self.world_size > 1:
+                self.train_dataloader.sampler.set_epoch(epoch)
+                self.val_dataloader.sampler.set_epoch(epoch)
             if self.device == 0:
                 log(self.seperator)
                 log(f"Epoch {epoch + 1}/{epochs} starting.")
@@ -311,7 +314,8 @@ class Trainer:
                 log(f"Process {self.device} took {epoch_end_time - epoch_start_time} seconds.")
 
         # Now training is completed, print some stuff
-        dist.barrier()
+        if self.world_size > 1:
+            dist.barrier()
         self.save_model_weights('final')  # save the final weights
         end_time = time.time()
         seconds_taken = end_time - start_time
@@ -505,12 +509,19 @@ def main(fold: int,
     # This sets the behavior of some modules in json models utils.
     ModuleStateController.set_state(state)
     session_id = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%f')
-
-    mp.spawn(
-        ddp_training,
-        args=(gpus, dataset_id, fold, save_latest, model, session_id, load_weights, config, preload),
-        nprocs=gpus
-    )
+    if gpus > 1:
+        mp.spawn(
+            ddp_training,
+            args=(gpus, dataset_id, fold, save_latest, model, session_id, load_weights, config, preload),
+            nprocs=gpus
+        )
+    elif gpus == 1:
+        dataset_name = get_dataset_name_from_id(dataset_id)
+        trainer = Trainer(dataset_name, fold, save_latest, model, 0, session_id, config,
+                      checkpoint_name=load_weights, preload=preload, world_size=1)
+        trainer.train()
+    else:
+        raise NotImplementedError('You ust set gpus to >= 1')
 
 
 if __name__ == "__main__":
