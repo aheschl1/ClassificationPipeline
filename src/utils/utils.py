@@ -236,8 +236,12 @@ def get_dataloaders_from_fold(dataset_name: str, fold: int,
                                                            fold) \
         if preprocessed_data else get_raw_datapoints_folded(dataset_name, fold)
 
-    train_dataset = PipelineDataset(train_points, train_transforms, store_metadata=store_metadata, preload=preload)
-    val_dataset = PipelineDataset(val_points, val_transforms, store_metadata=store_metadata, preload=preload)
+    train_dataset = PipelineDataset(train_points, train_transforms,
+                                    store_metadata=store_metadata, preload=preload,
+                                    shared_block=kwargs.get('shared_block', None))
+    val_dataset = PipelineDataset(val_points, val_transforms,
+                                  store_metadata=store_metadata, preload=preload,
+                                  shared_block=kwargs.get('shared_block', None))
     train_sampler, val_sampler = None, None
     if 'sampler' in kwargs and kwargs['sampler'] is not None:
         assert 'rank' in kwargs and 'world_size' in kwargs, \

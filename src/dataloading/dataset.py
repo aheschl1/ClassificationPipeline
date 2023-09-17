@@ -2,8 +2,6 @@ from typing import List, Callable, Tuple
 
 import torch
 from torch.utils.data import Dataset
-from tqdm import tqdm
-
 from src.dataloading.datapoint import Datapoint
 
 
@@ -13,7 +11,8 @@ class PipelineDataset(Dataset):
                  datapoints: List[Datapoint],
                  transforms: Callable = None,
                  store_metadata: bool = False,
-                 preload=False
+                 preload: bool = False,
+                 shared_block=None
                  ):
         """
         Custom dataset for this pipeline.
@@ -25,15 +24,8 @@ class PipelineDataset(Dataset):
         self.transforms = transforms
         self.store_metadata = store_metadata
         self.num_classes = self._get_number_of_classes()
+        self.shared_block = shared_block
         self.preload = preload
-        self.preloaded = []
-        self._maybe_preload_data()
-
-    def _maybe_preload_data(self) -> None:
-        if not self.preload:
-            return
-        for point in tqdm(self.datapoints, desc="Preloading data"):
-            self.preloaded.append((point.get_data(store_metadata=self.store_metadata), point))
 
     def _get_number_of_classes(self):
         """
@@ -58,11 +50,19 @@ class PipelineDataset(Dataset):
         :param idx: The data to grab
         :return: The loaded datapoint
         """
-        if not self.preload:
-            point = self.datapoints[idx]
-            data = point.get_data(store_metadata=self.store_metadata)
-        else:
-            data, point = self.preloaded[idx]
+
+        point = self.datapoints[idx]
+        data = None
+        if self.preload:
+            assert self.shared_block is not None, "preload True and shared_block False"
+            if idx in self.shared_block:
+                data = self.shared_block[idx]
+
+        if data is None:
+            data = point.get_data(store_metadata=self.store_metadata,)
+            if self.preload:
+                self.shared_block[idx] = data
+
         if not isinstance(data, torch.Tensor):
             data = torch.from_numpy(data)
         if self.transforms is not None:

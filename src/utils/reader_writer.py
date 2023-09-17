@@ -56,7 +56,7 @@ class SimpleITKReaderWriter(BaseReaderWriter):
         with open(expected_file, 'wb') as file:
             return pickle.dump(data, file)
 
-    def read(self, path: str, store_metadata: bool = False) -> np.array:
+    def read(self, path: str, store_metadata: bool = False, **kwargs) -> np.array:
         self.has_read = True
         self.__verify_extension('.'.join(path.split('.')[1:]))
         image = sitk.ReadImage(path)
@@ -102,7 +102,7 @@ class NaturalReaderWriter(BaseReaderWriter):
     def __verify_extension(self, extension: str) -> None:
         assert extension in ['png', 'jpg', 'npy'], f'Invalid extension {extension} for reader NaturalReaderWriter.'
 
-    def read(self, path: str, store_metadata: bool = False) -> np.array:
+    def read(self, path: str, store_metadata: bool = False, **kwargs) -> np.array:
         name = path.split('/')[-1]
         extension = '.'.join(name.split('.')[1:])
         self.__verify_extension(extension)
