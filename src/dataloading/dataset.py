@@ -3,7 +3,6 @@ from typing import List, Callable, Tuple
 import torch
 from torch.utils.data import Dataset
 from src.dataloading.datapoint import Datapoint
-from src.dataloading.shared_manager import SharedMemoryManager
 
 
 class PipelineDataset(Dataset):
@@ -26,7 +25,6 @@ class PipelineDataset(Dataset):
         self.store_metadata = store_metadata
         self.num_classes = self._get_number_of_classes()
         self.preload = preload
-        self.expected_shape = None
         self.dataset_type = dataset_type
 
     def _get_number_of_classes(self):
@@ -54,15 +52,7 @@ class PipelineDataset(Dataset):
         """
 
         point = self.datapoints[idx]
-        data = None
-        if self.preload:
-            try:
-                data = SharedMemoryManager.get_array(idx, self.dataset_type, self.expected_shape)
-            except FileNotFoundError: ...
-
-        if data is None:
-            data = point.get_data(store_metadata=self.store_metadata, )
-            self.expected_shape = data.shape
+        data = point.get_data(store_metadata=self.store_metadata, )
 
         if not isinstance(data, torch.Tensor):
             data = torch.from_numpy(data)

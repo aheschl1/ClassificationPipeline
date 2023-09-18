@@ -9,7 +9,6 @@ from src.dataloading.datapoint import Datapoint
 from src.dataloading.dataset import PipelineDataset
 from src.utils.constants import PREPROCESSED_ROOT, RAW_ROOT
 
-
 def write_json(data: Dict, path: str, create_folder: bool = False) -> None:
     """
     Write helper for json.
@@ -254,21 +253,23 @@ def get_dataloaders_from_fold(dataset_name: str, fold: int,
     train_dataloader = DataLoader(
         train_dataset,
         batch_size=kwargs.get('batch_size', config['batch_size']),
-        num_workers=(0 if train_sampler is not None else config['processes']),
+        num_workers=config['processes'],
         shuffle=train_sampler is None,
         pin_memory=False,
         collate_fn=batch_collate_fn,
-        sampler=train_sampler
+        sampler=train_sampler,
+        persistent_workers=True
     )
 
     val_dataloader = DataLoader(
         val_dataset,
         batch_size=kwargs.get('batch_size', config['batch_size']),
-        num_workers=(0 if train_sampler is not None else config['processes']),
+        num_workers=config['processes'],
         shuffle=False,
         pin_memory=False,
         collate_fn=batch_collate_fn,
-        sampler=val_sampler
+        sampler=val_sampler,
+        persistent_workers=True
     )
 
     return train_dataloader, val_dataloader

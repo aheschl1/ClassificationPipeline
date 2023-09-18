@@ -28,7 +28,6 @@ import torch.distributed as dist
 import matplotlib.pyplot as plt
 import datetime
 from torchvision.transforms import Resize
-import multiprocessing as mp
 
 import sys
 import pdb
@@ -287,7 +286,9 @@ class Trainer:
                 self.val_dataloader.sampler.set_epoch(epoch)
             if self.device == 0:
                 log(self.seperator)
-                log(f"Epoch {epoch + 1}/{epochs} starting.")
+                log(f"Epoch {epoch + 1}/{epochs} running...")
+                if epoch == 0 and self.world_size > 1:
+                    log("First epoch will be slow due to loading workers.")
             self.model.train()
             mean_train_loss = self._train_single_epoch()
             self.model.eval()
@@ -516,7 +517,8 @@ def main(fold: int,
             ddp_training,
             args=(gpus, dataset_id, fold, save_latest, model, session_id,
                   load_weights, config, preload),
-            nprocs=gpus
+            nprocs=gpus,
+            join=True
         )
     elif gpus == 1:
         dataset_name = get_dataset_name_from_id(dataset_id)
