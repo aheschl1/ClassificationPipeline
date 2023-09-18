@@ -120,8 +120,7 @@ class Trainer:
                  config_name: str,
                  checkpoint_name: str = None,
                  preload: bool = True,
-                 world_size: int = 1,
-                 shared_block = None):
+                 world_size: int = 1):
         """
         Trainer class for training and checkpointing of networks.
         :param dataset_name: The name of the dataset to use.
@@ -148,7 +147,6 @@ class Trainer:
         self.label_to_id = read_json(f"{PREPROCESSED_ROOT}/{dataset_name}/label_to_id.json")
         self.seperator = "======================================================================="
         # Start on important stuff here
-        self.shared_block = shared_block
         self.train_dataloader, self.val_dataloader = self._get_dataloaders()
         self.model = self._get_model(model_path)
         if self.world_size > 1:
@@ -204,8 +202,7 @@ class Trainer:
             sampler=(None if self.world_size == 1 else DistributedSampler),
             preload=self.preload,
             rank=self.device,
-            world_size=self.world_size,
-            shared_block=self.shared_block
+            world_size=self.world_size
         )
 
     def _train_single_epoch(self) -> float:
@@ -450,10 +447,9 @@ def setup_ddp(rank: int, world_size: int) -> None:
 
 def ddp_training(rank, world_size: int, dataset_id: int,
                  fold: int, save_latest: bool, model: str,
-                 session_id: str, load_weights: str, config: str, preload: bool, shared_block) -> None:
+                 session_id: str, load_weights: str, config: str, preload: bool) -> None:
     """
     Launches training on a single process using pytorch ddp.
-    :param shared_block:
     :param preload:
     :param config: The name of the config to load.
     :param session_id: Session id to be used for folder name on output.
@@ -469,7 +465,7 @@ def ddp_training(rank, world_size: int, dataset_id: int,
     setup_ddp(rank, world_size)
     dataset_name = get_dataset_name_from_id(dataset_id)
     trainer = Trainer(dataset_name, fold, save_latest, model, rank, session_id, config,
-                      checkpoint_name=load_weights, preload=preload, world_size=world_size, shared_block=shared_block)
+                      checkpoint_name=load_weights, preload=preload, world_size=world_size)
     trainer.train()
     destroy_process_group()
 
@@ -515,23 +511,20 @@ def main(fold: int,
     # This sets the behavior of some modules in json models utils.
     ModuleStateController.set_state(state)
     session_id = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%f')
-    with mp.Manager() as manager:
-        shared_block = manager.dict()
-        if gpus > 1:
-            mp.spawn(
-                ddp_training,
-                args=(gpus, dataset_id, fold, save_latest, model, session_id,
-                      load_weights, config, preload, shared_block),
-                nprocs=gpus
-            )
-        elif gpus == 1:
-            dataset_name = get_dataset_name_from_id(dataset_id)
-            trainer = Trainer(dataset_name, fold, save_latest, model, 0, session_id, config,
-                              checkpoint_name=load_weights, preload=preload, world_size=1,
-                              shared_block=shared_block)
-            trainer.train()
-        else:
-            raise NotImplementedError('You ust set gpus to >= 1')
+    if gpus > 1:
+        mp.spawn(
+            ddp_training,
+            args=(gpus, dataset_id, fold, save_latest, model, session_id,
+                  load_weights, config, preload),
+            nprocs=gpus
+        )
+    elif gpus == 1:
+        dataset_name = get_dataset_name_from_id(dataset_id)
+        trainer = Trainer(dataset_name, fold, save_latest, model, 0, session_id, config,
+                          checkpoint_name=load_weights, preload=preload, world_size=1)
+        trainer.train()
+    else:
+        raise NotImplementedError('You ust set gpus to >= 1')
 
 
 if __name__ == "__main__":
