@@ -3,7 +3,8 @@ from typing import List, Callable, Tuple
 import torch
 from torch.utils.data import Dataset
 from src.dataloading.datapoint import Datapoint
-
+from signal import signal, SIGPIPE, SIG_DFL
+signal(SIGPIPE,SIG_DFL)
 
 class PipelineDataset(Dataset):
 
@@ -12,7 +13,8 @@ class PipelineDataset(Dataset):
                  transforms: Callable = None,
                  store_metadata: bool = False,
                  preload: bool = False,
-                 shared_block=None
+                 shared_block=None,
+                 type: str = "train"
                  ):
         """
         Custom dataset for this pipeline.
@@ -26,6 +28,7 @@ class PipelineDataset(Dataset):
         self.num_classes = self._get_number_of_classes()
         self.shared_block = shared_block
         self.preload = preload
+        self.type=type
 
     def _get_number_of_classes(self):
         """
@@ -53,15 +56,16 @@ class PipelineDataset(Dataset):
 
         point = self.datapoints[idx]
         data = None
+        data_key = f"{self.type}_{idx}"
         if self.preload:
-            assert self.shared_block is not None, "preload True and shared_block False"
-            if idx in self.shared_block:
-                data = self.shared_block[idx]
+            assert self.shared_block is not None, "preload True and shared_block is None. Devs fault :("
+            if data_key in self.shared_block:
+                data = self.shared_block[data_key]
 
         if data is None:
             data = point.get_data(store_metadata=self.store_metadata,)
             if self.preload:
-                self.shared_block[idx] = data
+                self.shared_block[data_key] = data
 
         if not isinstance(data, torch.Tensor):
             data = torch.from_numpy(data)
