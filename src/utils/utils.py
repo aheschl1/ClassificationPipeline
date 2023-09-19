@@ -2,12 +2,13 @@ import glob
 import json
 import os
 from typing import Dict, List, Union, Tuple
-
+import numpy as np
 import torch
 from torch.utils.data import DataLoader
 from src.dataloading.datapoint import Datapoint
 from src.dataloading.dataset import PipelineDataset
 from src.utils.constants import PREPROCESSED_ROOT, RAW_ROOT
+import matplotlib.pyplot as plt
 
 
 def write_json(data: Union[Dict, List], path: str, create_folder: bool = False) -> None:
@@ -210,6 +211,19 @@ def batch_collate_fn(batch: List[Tuple[torch.Tensor, Datapoint]]) -> Tuple[torch
         labels.append(label)
 
     return torch.stack(data), torch.stack(labels), points
+
+
+def make_validation_bar_plot(results: Dict[int, int], output_path: str):
+    quantities, labels = [], []
+    for label, quantity in results.items():
+        quantities.append(quantity)
+        labels.append(label)
+    x_axis = np.arange(len(labels))
+    plt.bar(x_axis, quantities, 0.4)
+    plt.xticks(x_axis, labels)
+    plt.xlabel("Label")
+    plt.ylabel("Accuracy")
+    plt.savefig(f"{output_path}")
 
 
 def get_dataloaders_from_fold(dataset_name: str, fold: int,

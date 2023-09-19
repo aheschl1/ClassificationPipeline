@@ -3,7 +3,7 @@ import sys
 # Adds the source to path for imports and stuff
 sys.path.append("/home/andrew.heschl/Documents/ClassificationPipeline")
 sys.path.append("/home/andrewheschl/PycharmProjects/classification_pipeline")
-from src.utils.utils import get_case_name_from_number, write_json
+from src.utils.utils import get_case_name_from_number, write_json, read_json
 from src.utils.constants import *
 from src.preprocessing.preprocess_entry import Preprocessor
 import shutil
@@ -55,8 +55,7 @@ class CardiacEchoViewPreprocessor(Preprocessor):
         data = [row for _, row in
                 enumerate(row_series)]
         with ThreadPool(self.processes) as pool:
-            pool.map(self._process_case, data[0:10])
-        print(self.case_grouping)
+            pool.map(self._process_case, data[0:100])
         # rename cases to be correct
         cases = glob.glob(f"{DATA_ROOT}/raw/{self.dataset_name}/**/*.png", recursive=True)
         uuid_case_mapping = {}
@@ -68,6 +67,43 @@ class CardiacEchoViewPreprocessor(Preprocessor):
         self.uuid_case_mapping = uuid_case_mapping
         self._save_case_grouping()
         super().process()
+
+    @override
+    def post_preprocessing(self):
+        import matplotlib.pyplot as plt
+
+        def class_distribution_fold(fold_number: int, fold_to_analyze: Dict):
+            train_labels, val_labels = [], []
+            for case in fold_to_analyze['train']:
+                train_labels.append(id_label_mapping[str(case_label_mapping[case])])
+            for case in fold_to_analyze['val']:
+                val_labels.append(id_label_mapping[str(case_label_mapping[case])])
+            all_labels = list(set(train_labels).union(set(val_labels)))
+            train_quantities, val_quantities = [], []
+            for label in all_labels:
+                train_quantities.append(train_labels.count(label))
+                val_quantities.append(val_labels.count(label))
+
+            train_quantities = np.array(train_quantities)
+            val_quantities = np.array(val_quantities)
+            train_quantities /= np.sum(train_quantities)
+            val_quantities /= np.sum(val_quantities)
+
+            x_axis = np.arange(len(all_labels))
+            plt.bar(x_axis-0.2, train_quantities, 0.4, label='Train')
+            plt.bar(x_axis+0.2, val_quantities, 0.4, label='Val')
+            plt.xticks(x_axis, all_labels)
+            plt.xlabel("Labels")
+            plt.ylabel("Proportion of Cases Across Set")
+            plt.legend()
+            plt.savefig(f"{PREPROCESSED_ROOT}/{self.dataset_name}/case_distribution_fold{fold_number}.png")
+
+        # Prep mapping and call per fold
+        folds = read_json(f"{PREPROCESSED_ROOT}/{self.dataset_name}/folds.json")
+        case_label_mapping = read_json(f"{PREPROCESSED_ROOT}/{self.dataset_name}/case_label_mapping.json")
+        id_label_mapping = read_json(f"{PREPROCESSED_ROOT}/{self.dataset_name}/id_to_label.json")
+        for fold in folds:
+            class_distribution_fold(fold, folds[fold])
 
     def _save_case_grouping(self):
         information = []

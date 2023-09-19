@@ -17,7 +17,8 @@ from torch.optim import SGD
 from torch.utils.data import DataLoader
 
 from src.utils.constants import *
-from src.utils.utils import get_dataset_name_from_id, read_json, get_dataloaders_from_fold, get_config_from_dataset
+from src.utils.utils import get_dataset_name_from_id, read_json, get_dataloaders_from_fold, get_config_from_dataset, \
+    write_json, make_validation_bar_plot
 from src.json_models.src.model_generator import ModelGenerator
 from src.json_models.src.modules import ModuleStateController
 import torch.multiprocessing as mp
@@ -236,6 +237,7 @@ class Trainer:
         :return: The mean loss and mean accuracy respectively.
         """
 
+        # noinspection PyUnresolvedReferences
         def count_correct(a: torch.Tensor, b: torch.Tensor) -> int:
             """
             Given two tensors, counts the agreement using a one-hot encoding.
@@ -246,8 +248,13 @@ class Trainer:
             assert a.shape == b.shape, f"Tensor a and b are different shapes. Got {a.shape} and {b.shape}"
             assert len(a.shape) == 2, f"Why is the prediction or gt shape of {a.shape}"
             results = torch.argmax(a, dim=1) == torch.argmax(b, dim=1)
+            for i, label_results in enumerate(results.T):
+                results_per_label[i] = torch.sum(label_results)/results.shape[0]
+            # case_distribution_fold
+            make_validation_bar_plot(results_per_label, f"{self.output_dir}/case_distribution_fold_{self.fold}")
             return results.sum().item()
 
+        results_per_label = {}
         running_loss = 0.
         correct_count = 0.
         total_items = 0
@@ -261,6 +268,7 @@ class Trainer:
             running_loss += loss.item()
             correct_count += count_correct(predictions, labels)
             total_items += batch_size
+        write_json(results_per_label, f"{self.output_dir}/validation_results.json")
 
         return running_loss / total_items, correct_count / total_items
 
