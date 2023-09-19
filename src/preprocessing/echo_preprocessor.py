@@ -55,7 +55,7 @@ class CardiacEchoViewPreprocessor(Preprocessor):
         data = [row for _, row in
                 enumerate(row_series)]
         with ThreadPool(self.processes) as pool:
-            pool.map(self._process_case, data[0:100])
+            pool.map(self._process_case, data)
         # rename cases to be correct
         cases = glob.glob(f"{DATA_ROOT}/raw/{self.dataset_name}/**/*.png", recursive=True)
         uuid_case_mapping = {}
@@ -84,8 +84,8 @@ class CardiacEchoViewPreprocessor(Preprocessor):
                 train_quantities.append(train_labels.count(label))
                 val_quantities.append(val_labels.count(label))
 
-            train_quantities = np.array(train_quantities)
-            val_quantities = np.array(val_quantities)
+            train_quantities = np.array(train_quantities, dtype=float)
+            val_quantities = np.array(val_quantities, dtype=float)
             train_quantities /= np.sum(train_quantities)
             val_quantities /= np.sum(val_quantities)
 
@@ -122,7 +122,8 @@ class CardiacEchoViewPreprocessor(Preprocessor):
         :return: Folds map
         """
         assert k == 1, "Echo preprocessor can only do one fold right now. The dev sucked too much"
-        train_groups, test_groups = train_test_split(self.case_grouping)
+
+        train_groups, test_groups = train_test_split(self.case_grouping, random_state=42, shuffle=True)
         train_cases, val_cases = [], []
         for group in train_groups:
             for case in group:
