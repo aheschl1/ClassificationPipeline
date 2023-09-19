@@ -249,9 +249,10 @@ class Trainer:
             assert len(a.shape) == 2, f"Why is the prediction or gt shape of {a.shape}"
             results = torch.argmax(a, dim=1) == torch.argmax(b, dim=1)
             for i, label_results in enumerate(results.T):
-                results_per_label[i] = torch.sum(label_results).cpu()/results.cpu().shape[0]
+                if i not in results_per_label:
+                    results_per_label[i] = 0
+                results_per_label[i] += torch.sum(label_results).cpu()/results.cpu().shape[0]
             # case_distribution_fold
-            make_validation_bar_plot(results_per_label, f"{self.output_dir}/label_distribution_fold_{self.fold}")
             return results.sum().item()
 
         results_per_label = {}
@@ -269,7 +270,7 @@ class Trainer:
             correct_count += count_correct(predictions, labels)
             total_items += batch_size
         write_json(results_per_label, f"{self.output_dir}/validation_results.json")
-
+        make_validation_bar_plot(results_per_label, f"{self.output_dir}/label_distribution_fold_{self.fold}")
         return running_loss / total_items, correct_count / total_items
 
     # noinspection PyUnresolvedReferences
