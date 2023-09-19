@@ -3,7 +3,7 @@ import sys
 # Adds the source to path for imports and stuff
 sys.path.append("/home/andrew.heschl/Documents/ClassificationPipeline")
 sys.path.append("/home/andrewheschl/PycharmProjects/classification_pipeline")
-from src.utils.utils import get_case_name_from_number
+from src.utils.utils import get_case_name_from_number, write_json
 from src.utils.constants import *
 from src.preprocessing.preprocess_entry import Preprocessor
 import shutil
@@ -55,7 +55,8 @@ class CardiacEchoViewPreprocessor(Preprocessor):
         data = [row for _, row in
                 enumerate(row_series)]
         with ThreadPool(self.processes) as pool:
-            pool.map(self._process_case, data)
+            pool.map(self._process_case, data[0:10])
+        print(self.case_grouping)
         # rename cases to be correct
         cases = glob.glob(f"{DATA_ROOT}/raw/{self.dataset_name}/**/*.png", recursive=True)
         uuid_case_mapping = {}
@@ -65,7 +66,17 @@ class CardiacEchoViewPreprocessor(Preprocessor):
             uuid_case_mapping[old_id] = case_name
             shutil.move(path, '/'.join(path.split('/')[0:-1] + [f"{case_name}.png"]))
         self.uuid_case_mapping = uuid_case_mapping
+        self._save_case_grouping()
         super().process()
+
+    def _save_case_grouping(self):
+        information = []
+        for group in self.case_grouping:
+            case_group = []
+            for case in group:
+                case_group.append(self.uuid_case_mapping[case])
+            information.append(case_group)
+        write_json(information, f"{PREPROCESSED_ROOT}/{self.dataset_name}/case_grouping.json")
 
     @override
     def get_folds(self, k: int) -> Dict[int, Dict[str, list]]:

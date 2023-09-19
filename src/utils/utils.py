@@ -9,7 +9,8 @@ from src.dataloading.datapoint import Datapoint
 from src.dataloading.dataset import PipelineDataset
 from src.utils.constants import PREPROCESSED_ROOT, RAW_ROOT
 
-def write_json(data: Dict, path: str, create_folder: bool = False) -> None:
+
+def write_json(data: Union[Dict, List], path: str, create_folder: bool = False) -> None:
     """
     Write helper for json.
     :param data: Dictionary data to be written.
