@@ -251,7 +251,7 @@ class Trainer:
             for i, label_results in enumerate(results.T):
                 results_per_label[i] = torch.sum(label_results)/results.shape[0]
             # case_distribution_fold
-            make_validation_bar_plot(results_per_label, f"{self.output_dir}/case_distribution_fold_{self.fold}")
+            make_validation_bar_plot(results_per_label, f"{self.output_dir}/label_distribution_fold_{self.fold}")
             return results.sum().item()
 
         results_per_label = {}
