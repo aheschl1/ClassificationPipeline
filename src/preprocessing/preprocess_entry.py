@@ -56,8 +56,8 @@ class Preprocessor:
         splits_map = self.get_folds(self.folds)
         write_json(splits_map, f"{PREPROCESSED_ROOT}/{self.dataset_name}/folds.json")
         # We now have the folds: time to preprocess the data
-        # for fold_id, _ in splits_map.items():
-        #     self.process_fold(fold_id)
+        for fold_id, _ in splits_map.items():
+            self.process_fold(fold_id)
         self.post_preprocessing()
 
     def post_preprocessing(self):...
