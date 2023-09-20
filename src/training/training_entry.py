@@ -8,7 +8,7 @@ import logging
 import os.path
 import time
 from typing import Tuple
-
+from torch.optim.lr_scheduler import ExponentialLR
 import click
 import multiprocessing_logging  # for multiprocess logging https://github.com/jruere/multiprocessing-logging
 import torch
@@ -289,6 +289,7 @@ class Trainer:
         last_train_loss = 0
         last_val_loss = 0
         last_val_accuracy = 0
+        scheduler = ExponentialLR(self.optim, gamma=0.9)
         for epoch in range(epochs):
             # epoch timing
             # ForkedPdb().set_trace()
@@ -304,12 +305,14 @@ class Trainer:
             self.model.train()
             mean_train_loss = self._train_single_epoch()
             self.model.eval()
+            scheduler.step()
             with torch.no_grad():
                 mean_val_loss, val_accuracy = self._eval_single_epoch()
             if self.save_latest:
                 self.save_model_weights('latest')  # saving model every epoch
             if self.device == 0:
                 self.log_helper.epoch_end(mean_train_loss, mean_val_loss, val_accuracy)
+                log("Learning rate: ", scheduler.optimizer.param_groups[0]['lr'])
                 log(f"Train loss: {mean_train_loss} --change-- {mean_train_loss - last_train_loss}")
                 log(f"Val loss: {mean_val_loss} --change-- {mean_val_loss - last_val_loss}")
                 log(f"Val accuracy: {val_accuracy} --change-- {val_accuracy - last_val_accuracy}")
