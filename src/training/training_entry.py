@@ -29,7 +29,7 @@ import torch.distributed as dist
 import matplotlib.pyplot as plt
 import datetime
 from torchvision.transforms import Resize
-
+from torchvision import transforms
 import sys
 import pdb
 
@@ -191,7 +191,10 @@ class Trainer:
         This method is responsible for creating the augmentation and then fetching dataloaders.
         :return: Train and val dataloaders.
         """
-        train_transforms = Resize(self.config.get('target_size', [512, 512]), antialias=True)
+        train_transforms = transforms.Compose([
+            Resize(self.config.get('target_size', [512, 512]), antialias=True),
+            transforms.RandomRotation(degrees=10),
+            transforms.RandomGrayscale(p=1),])
         val_transforms = Resize(self.config.get('target_size', [512, 512]), antialias=True)
         self.train_transforms = train_transforms
         return get_dataloaders_from_fold(
@@ -238,20 +241,20 @@ class Trainer:
         """
 
         # noinspection PyUnresolvedReferences
-        def count_correct(a: torch.Tensor, b: torch.Tensor) -> int:
+        def count_correct(preds: torch.Tensor, labels: torch.Tensor) -> int:
             """
             Given two tensors, counts the agreement using a one-hot encoding.
             :param a: The first tensor
             :param b: The second tensor
             :return: Count of agreement at dim 1
             """
-            assert a.shape == b.shape, f"Tensor a and b are different shapes. Got {a.shape} and {b.shape}"
-            assert len(a.shape) == 2, f"Why is the prediction or gt shape of {a.shape}"
-            results = torch.argmax(a, dim=1) == torch.argmax(b, dim=1)
-            for i, label_results in enumerate(results.T):
+            assert preds.shape == labels.shape, f"Tensor a and b are different shapes. Got {preds.shape} and {labels.shape}"
+            assert len(preds.shape) == 2, f"Why is the prediction or gt shape of {pred.shape}"
+            results = torch.argmax(preds, dim=1) == torch.argmax(labels, dim=1)
+            for i, (label, pred) in enumerate(zip(labels.permute(1, 0), preds.permute(1, 0))):
                 if i not in results_per_label:
                     results_per_label[i] = 0
-                results_per_label[i] += torch.sum(label_results).cpu()/results.cpu().shape[0]
+                results_per_label[i] += (torch.sum(label==pred)/torch.sum(labels[:,i])).cpu().item()
             # case_distribution_fold
             return results.sum().item()
 
@@ -269,8 +272,8 @@ class Trainer:
             running_loss += loss.item()
             correct_count += count_correct(predictions, labels)
             total_items += batch_size
-        write_json(results_per_label, f"{self.output_dir}/validation_results.json")
-        make_validation_bar_plot(results_per_label, f"{self.output_dir}/label_distribution_fold_{self.fold}")
+        write_json(results_per_label, f"{self.output_dir}/accuracy_per_class.json")
+        make_validation_bar_plot(results_per_label, f"{self.output_dir}/accuracy_per_class.png")
         return running_loss / total_items, correct_count / total_items
 
     # noinspection PyUnresolvedReferences

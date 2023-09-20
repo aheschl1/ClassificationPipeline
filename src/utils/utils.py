@@ -214,6 +214,9 @@ def batch_collate_fn(batch: List[Tuple[torch.Tensor, Datapoint]]) -> Tuple[torch
 
 
 def make_validation_bar_plot(results: Dict[int, int], output_path: str):
+    """
+    Generates and saves plot of accuracy per class for validation
+    """
     quantities, labels = [], []
     for label, quantity in results.items():
         quantities.append(quantity)
@@ -224,6 +227,7 @@ def make_validation_bar_plot(results: Dict[int, int], output_path: str):
     plt.xlabel("Label")
     plt.ylabel("Accuracy")
     plt.savefig(f"{output_path}")
+    plt.clf()
 
 
 def get_dataloaders_from_fold(dataset_name: str, fold: int,
