@@ -251,12 +251,13 @@ class Trainer:
             assert preds.shape == labels.shape, f"Tensor a and b are different shapes. Got {preds.shape} and {labels.shape}"
             assert len(preds.shape) == 2, f"Why is the prediction or gt shape of {pred.shape}"
             results = torch.argmax(preds, dim=1) == torch.argmax(labels, dim=1)
-            for i, (label, pred) in enumerate(zip(labels.permute(1, 0), preds.permute(1, 0))):
-                if i not in results_per_label:
-                    results_per_label[i] = 0
-                    total_per_label[i] = 0
-                results_per_label[i] += (torch.sum(label==pred)).cpu().item()
-                total_per_label[i] += torch.sum(labels[:,i]).cpu().item()
+            for label, pred in zip(torch.argmax(labels, dim=1), torch.argmax(preds, dim=1)):
+                actual_class = torch.argmax(label)
+                if actual_class not in results_per_label:
+                    results_per_label[actual_class] = 0
+                    total_per_label[actual_class] = 0
+                results_per_label[actual_class] += (torch.sum(label==pred)).cpu().item()
+                total_per_label[actual_class] += 1
                 print(results_per_label)
             # case_distribution_fold
             return results.sum().item()
