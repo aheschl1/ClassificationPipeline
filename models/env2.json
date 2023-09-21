@@ -1,0 +1,40 @@
+{
+    "LogKwargs": {
+        "backbone": "EfficientNetb6"
+    },
+    "Tag": "efficientnet-v2",
+    "Children": [
+        {
+            "ComponentClass": "env2",
+            "args": {
+                "weights": "EfficientNet_B6_Weights.IMAGENET1K_V1"
+            }
+        },
+        {
+            "ComponentClass": "Flatten",
+            "args": {}
+        },
+        {
+            "ComponentClass":"ReLU",
+            "args":{}
+        },
+        {
+            "ComponentClass": "Linear",
+            "args": {
+                "in_features": 1000,
+                "out_features": 256
+            }
+        },
+        {
+            "ComponentClass":"ReLU",
+            "args":{}
+        },
+        {
+            "ComponentClass": "Linear",
+            "args": {
+                "in_features": 256,
+                "out_features": 10
+            }
+        }
+    ]
+}

@@ -12,6 +12,8 @@ RAW_ROOT = f"{DATA_ROOT}/raw"
 PREPROCESSED_ROOT = f"{DATA_ROOT}/preprocessed"
 RESULTS_ROOT = f"{DATA_ROOT}/results"
 ENB6 = 'enb6'
+ENV2 = 'env2'
+
 CONCAT = 'concat'
 ADD = 'add'
 TWO_D = '2d'

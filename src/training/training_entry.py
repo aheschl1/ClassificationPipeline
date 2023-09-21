@@ -231,7 +231,6 @@ class Trainer:
             # gather data
             running_loss += loss.item()
             total_items += batch_size
-            break
 
         return running_loss / total_items
 

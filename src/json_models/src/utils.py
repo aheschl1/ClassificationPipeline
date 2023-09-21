@@ -13,6 +13,8 @@ def my_import(class_name: str, dropout_package: str = 'torch.nn'):
     # Here checks backbones
     if class_name == ENB6:
         return models.efficientnet_b6
+    elif class_name == ENV2:
+        return models.efficientnet_v2_l
     # Here checks modules
     if class_name == 'UpsamplingConv':
         from src.json_models.src.modules import UpsamplingConv
