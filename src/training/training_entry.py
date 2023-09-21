@@ -289,7 +289,7 @@ class Trainer:
         last_train_loss = 0
         last_val_loss = 0
         last_val_accuracy = 0
-        scheduler = ExponentialLR(self.optim, gamma=0.9, last_epoch=epochs-1)
+        scheduler = ExponentialLR(self.optim, gamma=0.9)
         for epoch in range(epochs):
             # epoch timing
             # ForkedPdb().set_trace()
