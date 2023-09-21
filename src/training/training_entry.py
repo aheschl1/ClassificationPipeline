@@ -231,6 +231,7 @@ class Trainer:
             # gather data
             running_loss += loss.item()
             total_items += batch_size
+            break
 
         return running_loss / total_items
 
@@ -254,11 +255,15 @@ class Trainer:
             for i, (label, pred) in enumerate(zip(labels.permute(1, 0), preds.permute(1, 0))):
                 if i not in results_per_label:
                     results_per_label[i] = 0
-                results_per_label[i] += (torch.sum(label==pred)/torch.sum(labels[:,i])).cpu().item()
+                    total_per_label[i] = 0
+                results_per_label[i] += (torch.sum(label==pred)).cpu().item()
+                total_per_label[i] += torch.sum(labels[:,i]).cpu().item()
+                print(results_per_label)
             # case_distribution_fold
             return results.sum().item()
 
         results_per_label = {}
+        total_per_label = {}
         running_loss = 0.
         correct_count = 0.
         total_items = 0
