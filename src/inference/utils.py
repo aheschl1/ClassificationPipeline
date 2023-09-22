@@ -5,13 +5,14 @@ from typing import Dict, List, Union, Tuple
 
 import torch
 from torch.utils.data import DataLoader
-from torchvision.transforms import Normalize, Compose, Resize
-
+from torchvision.transforms import Normalize, Compose, Resize, Lambda
 from src.dataloading.datapoint import Datapoint
 from src.dataloading.dataset import PipelineDataset
 from src.utils.utils import read_json
 from src.utils.constants import PREPROCESSED_ROOT, RAW_ROOT
 
+def process(x):
+    return x.float().permute(2, 0, 1)
 
 def get_dataset_from_folder(folder_path: str, dataset_name: str, fold: int, config: dict) -> PipelineDataset:
     """
@@ -32,10 +33,13 @@ def get_dataset_from_folder(folder_path: str, dataset_name: str, fold: int, conf
         mean_data = None
     for file in files:
         datapoints.append(Datapoint(file, 0, dataset_name))
+    print("=====================================warn: hardcoded stuff only for natural images===================================")
     transform_list = [
+        Lambda(lambda x: process(x)),
         Resize(config['target_size'], antialias=True)
     ]
     if mean_data is not None:
+        print(f"Normalizing the data with {mean_data}")
         transform_list.append(Normalize(mean=mean_data['mean'], std=mean_data['std']))
     transforms = Compose(transform_list)
     return PipelineDataset(datapoints, transforms)

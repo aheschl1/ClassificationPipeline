@@ -86,11 +86,11 @@ class Inferer:
 
     def _infer_entry(self) -> Dict[str, int]:
         results = {}
-        for data, _, point in tqdm(self.dataloader, desc="Running inference"):
+        for data, _, points in tqdm(self.dataloader, desc="Running inference"):
             data = data.to(0)
             predictions = self.model(data)
             predicted_class = torch.argmax(predictions[0]).detach().item()
-            results[point.path] = predicted_class
+            results[points[0].path] = predicted_class
         return results
 
     def infer(self) -> None:
