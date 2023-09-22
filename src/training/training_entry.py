@@ -252,7 +252,7 @@ class Trainer:
             assert len(preds.shape) == 2, f"Why is the prediction or gt shape of {pred.shape}"
             results = torch.argmax(preds, dim=1) == torch.argmax(labels, dim=1)
             for label, pred in zip(torch.argmax(labels, dim=1), torch.argmax(preds, dim=1)):
-                actual_class = torch.argmax(label)
+                actual_class = torch.argmax(label).cpu().item()
                 if actual_class not in results_per_label:
                     results_per_label[actual_class] = 0
                     total_per_label[actual_class] = 0
