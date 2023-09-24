@@ -303,3 +303,12 @@ def get_case_name_from_number(c: int) -> str:
     c = str(c)
     zeros = '0' * (5 - len(c))
     return f"case_{zeros}{c}"
+
+
+def get_weights_from_dataset(dataset: PipelineDataset) -> List[float]:
+    weights = [0 for _ in range(dataset.num_classes)]
+    for point in dataset.datapoints:
+        weights[point.label] += 1
+    total = sum(weights)
+    weights = [1. - (weight / total) for weight in weights]
+    return weights
