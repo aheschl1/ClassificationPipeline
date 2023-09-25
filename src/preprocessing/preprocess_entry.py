@@ -165,7 +165,7 @@ class Preprocessor:
                          val_normalize_loader, desc=f"Preprocessing {_set} set"):
                 point = points[0]
                 writer = point.reader_writer
-                data = data[0].float().squeeze()  # Take 0 cause batched
+                data = data[0].float()  # Take 0 cause batched
                 writer.write(
                     data,
                     f"{PREPROCESSED_ROOT}/{self.dataset_name}/fold_{fold}/{_set}/{point.case_name}."

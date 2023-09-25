@@ -71,7 +71,7 @@ class NaturalImageNormalizer(Normalizer):
         means = []
         for data, _, _ in tqdm(dataloader, desc="Calculating mean"):
             assert data.shape[0] == 1, "Expected batch size 1 for mean std calculations. Womp womp"
-            assert data.shape[3] == 3, f"NaturalImageNormalizer requires three channels, and shape [b, h, w, c]." \
+            assert len(data.shape) == 3 or data.shape[3] == 3, f"NaturalImageNormalizer requires three or one channels, and shape [b, h, w, c] or [b, h, w]." \
                                        f"Got {data.shape}"
             means.append(torch.mean(data.float(), dim=[0, 1, 2]))
 
@@ -103,7 +103,11 @@ class NaturalImageNormalizer(Normalizer):
         :param point:
         :return: Normalized data and other two points
         """
-        return Normalize(mean=self.mean, std=self.std)(data.float().permute(0, 3, 1, 2)), label, point
+        if len(data.shape) == 3:
+            data = data.unsqueeze(3)
+        data = data.float().permute(0, 3, 1, 2)
+
+        return Normalize(mean=self.mean, std=self.std)(data), label, point
 
 
 class CTNormalizer(Normalizer):
