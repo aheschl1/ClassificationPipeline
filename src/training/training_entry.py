@@ -18,7 +18,7 @@ from torch.utils.data import DataLoader
 
 from src.utils.constants import *
 from src.utils.utils import get_dataset_name_from_id, read_json, get_dataloaders_from_fold, get_config_from_dataset, \
-    write_json, make_validation_bar_plot
+    write_json, make_validation_bar_plot, get_weights_from_dataset
 from src.json_models.src.model_generator import ModelGenerator
 from src.json_models.src.modules import ModuleStateController
 import torch.multiprocessing as mp
@@ -252,13 +252,13 @@ class Trainer:
             assert len(preds.shape) == 2, f"Why is the prediction or gt shape of {pred.shape}"
             results = torch.argmax(preds, dim=1) == torch.argmax(labels, dim=1)
             for label, pred in zip(torch.argmax(labels, dim=1), torch.argmax(preds, dim=1)):
-                actual_class = torch.argmax(label).cpu().item()
-                if actual_class not in results_per_label:
-                    results_per_label[actual_class] = 0
-                    total_per_label[actual_class] = 0
-                results_per_label[actual_class] += (torch.sum(label==pred)).cpu().item()
-                total_per_label[actual_class] += 1
-                print(results_per_label)
+                label = label.cpu().item()
+                pred = pred.cpu().item()
+                if label not in results_per_label:
+                    results_per_label[label] = 0
+                    total_per_label[label] = 0
+                results_per_label[label] += (1 if label == pred else 0)
+                total_per_label[label] += 1
             # case_distribution_fold
             return results.sum().item()
 
@@ -278,6 +278,8 @@ class Trainer:
             correct_count += count_correct(predictions, labels)
             total_items += batch_size
         write_json(results_per_label, f"{self.output_dir}/accuracy_per_class.json")
+        for label in results_per_label:
+            results_per_label[label] /= total_per_label[label]
         make_validation_bar_plot(results_per_label, f"{self.output_dir}/accuracy_per_class.png")
         return running_loss / total_items, correct_count / total_items
 
@@ -432,7 +434,9 @@ class Trainer:
         """
         if self.device == 0:
             log("Loss being used is nn.CrossEntropyLoss()")
-        return nn.CrossEntropyLoss()
+        weights = get_weights_from_dataset(self.train_dataloader.dataset)
+        print(f"Loss using weights: {weights}")
+        return nn.CrossEntropyLoss(weight=torch.Tensor(weights).to(self.device))
 
     @property
     def data_shape(self) -> Tuple[int, int, int]:
