@@ -310,5 +310,5 @@ def get_weights_from_dataset(dataset: PipelineDataset) -> List[float]:
     for point in dataset.datapoints:
         weights[point.label] += 1
     total = sum(weights)
-    weights = [1. - (weight / total) for weight in weights]
+    weights = [1. - (weight / total) + 1 for weight in weights]
     return weights

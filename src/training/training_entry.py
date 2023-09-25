@@ -252,12 +252,13 @@ class Trainer:
             assert len(preds.shape) == 2, f"Why is the prediction or gt shape of {pred.shape}"
             results = torch.argmax(preds, dim=1) == torch.argmax(labels, dim=1)
             for label, pred in zip(torch.argmax(labels, dim=1), torch.argmax(preds, dim=1)):
-                actual_class = torch.argmax(label).cpu().item()
-                if actual_class not in results_per_label:
-                    results_per_label[actual_class] = 0
-                    total_per_label[actual_class] = 0
-                results_per_label[actual_class] += (torch.sum(label==pred)).cpu().item()
-                total_per_label[actual_class] += 1
+                label = label.cpu().item()
+                pred = pred.cpu().item()
+                if label not in results_per_label:
+                    results_per_label[label] = 0
+                    total_per_label[label] = 0
+                results_per_label[label] += (1 if label == pred else 0)
+                total_per_label[label] += 1
             # case_distribution_fold
             return results.sum().item()
 
@@ -434,6 +435,7 @@ class Trainer:
         if self.device == 0:
             log("Loss being used is nn.CrossEntropyLoss()")
         weights = get_weights_from_dataset(self.train_dataloader.dataset)
+        print(f"Loss using weights: {weights}")
         return nn.CrossEntropyLoss(weight=torch.Tensor(weights).to(self.device))
 
     @property
