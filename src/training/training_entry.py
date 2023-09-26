@@ -361,7 +361,7 @@ class Trainer:
         """
         if self.device == 0:
             path = f"{self.output_dir}/{save_name}.pth"
-            torch.save(self.model.state_dict(), path)
+            torch.save(self.model.module.state_dict(), path)
 
     def _get_optim(self) -> torch.optim:
         """
@@ -424,7 +424,10 @@ class Trainer:
             raise FileNotFoundError(f'The file {weights_path} does not exist. Check the weights argument.')
         map_location = {'cuda:0': f'cuda:{self.device}'}
         weights = torch.load(weights_path, map_location=map_location)
-        self.model.load_state_dict(weights)
+        if self.world_size > 1:
+            self.model.module.load_state_dict(weights)
+        else:
+            self.model.load_state_dict(weights)
         log(f"Successfully loaded weights on rank {self.device}.")
 
     def _get_loss(self) -> nn.Module:

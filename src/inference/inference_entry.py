@@ -80,7 +80,8 @@ class Inferer:
         model = gen.get_model().to(0)
         print('Model log args: ')
         print(gen.get_log_kwargs())
-        weights = torch.load(f"{self.lookup_root}/{self.weights}.pth")
+        map_location = {'cuda:0': f'cuda:0'}
+        weights = torch.load(f"{self.lookup_root}/{self.weights}.pth", map_location=map_location)
         model.load_state_dict(weights)
         return model
 

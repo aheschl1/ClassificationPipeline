@@ -12,6 +12,8 @@ from src.utils.utils import read_json
 from src.utils.constants import PREPROCESSED_ROOT, RAW_ROOT
 
 def process(x):
+    if len(x.shape) == 2:
+        x = x.unsqueeze(2)
     return x.float().permute(2, 0, 1)
 
 def get_dataset_from_folder(folder_path: str, dataset_name: str, fold: int, config: dict) -> PipelineDataset:
