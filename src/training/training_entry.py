@@ -361,7 +361,10 @@ class Trainer:
         """
         if self.device == 0:
             path = f"{self.output_dir}/{save_name}.pth"
-            torch.save(self.model.module.state_dict(), path)
+            if self.world_size > 1:
+                torch.save(self.model.module.state_dict(), path)
+            else:
+                torch.save(self.model.state_dict(), path)
 
     def _get_optim(self) -> torch.optim:
         """
