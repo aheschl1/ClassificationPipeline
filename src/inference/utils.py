@@ -36,6 +36,7 @@ def get_dataset_from_folder(folder_path: str, dataset_name: str, fold: int, conf
     for file in files:
         datapoints.append(Datapoint(file, 0, dataset_name))
     print("=====================================warn: hardcoded stuff only for natural images===================================")
+    print(config['target_size'])
     transform_list = [
         Lambda(lambda x: process(x)),
         Resize(config['target_size'], antialias=True)

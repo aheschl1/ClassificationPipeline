@@ -100,7 +100,6 @@ class Inferer:
         with torch.no_grad():
             results = self._infer_entry()
         print(f"Completed inference!")
-        print(results)
         print(f"Saving results to {save_path}.")
         write_json(results, save_path)
 
