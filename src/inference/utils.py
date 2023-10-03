@@ -5,7 +5,7 @@ from typing import Dict, List, Union, Tuple
 
 import torch
 from torch.utils.data import DataLoader
-from torchvision.transforms import Normalize, Compose, Resize, Lambda
+from torchvision.transforms import Normalize, Compose, Resize, Lambda, RandomGrayscale
 from src.dataloading.datapoint import Datapoint
 from src.dataloading.dataset import PipelineDataset
 from src.utils.utils import read_json
@@ -39,7 +39,8 @@ def get_dataset_from_folder(folder_path: str, dataset_name: str, fold: int, conf
     print(config['target_size'])
     transform_list = [
         Lambda(lambda x: process(x)),
-        Resize(config['target_size'], antialias=True)
+        Resize(config['target_size'], antialias=True),
+        RandomGrayscale(p=1)
     ]
     if mean_data is not None:
         print(f"Normalizing the data with {mean_data}")

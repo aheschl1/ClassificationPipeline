@@ -194,8 +194,12 @@ class Trainer:
         train_transforms = transforms.Compose([
             Resize(self.config.get('target_size', [512, 512]), antialias=True),
             transforms.RandomRotation(degrees=10),
-            transforms.RandomGrayscale(p=1),])
-        val_transforms = Resize(self.config.get('target_size', [512, 512]), antialias=True)
+            transforms.RandomGrayscale(p=1),
+        ])
+        val_transforms = transforms.Compose[
+            Resize(self.config.get('target_size', [512, 512]), antialias=True),
+            transforms.RandomGrayscale(p=1)
+        ]
         self.train_transforms = train_transforms
         return get_dataloaders_from_fold(
             self.dataset_name,
