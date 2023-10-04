@@ -244,8 +244,8 @@ class Trainer:
         def count_correct(preds: torch.Tensor, labels: torch.Tensor) -> int:
             """
             Given two tensors, counts the agreement using a one-hot encoding.
-            :param a: The first tensor
-            :param b: The second tensor
+            :param preds:
+            :param labels: The second tensor
             :return: Count of agreement at dim 1
             """
             assert preds.shape == labels.shape, f"Tensor a and b are different shapes. Got {preds.shape} and {labels.shape}"
