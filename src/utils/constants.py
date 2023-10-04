@@ -14,6 +14,7 @@ RESULTS_ROOT = f"{DATA_ROOT}/results"
 ENB6 = 'enb6'
 ENB4 = 'enb4'
 ENV2 = 'env2'
+ENB0 = 'enb0'
 
 CONCAT = 'concat'
 ADD = 'add'

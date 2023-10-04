@@ -1,0 +1,44 @@
+{
+    "Tag": "efficientnet-b0",
+    "Children": [
+        {
+            "ComponentClass":"Conv",
+            "args":{
+                "in_channels":1,
+                "out_channels": 3
+            }
+        },
+        {
+            "ComponentClass": "enb0",
+            "args": {
+                "weights": "EfficientNet_B0_Weights.IMAGENET1K_V1"
+            }
+        },
+        {
+            "ComponentClass": "Flatten",
+            "args": {}
+        },
+        {
+            "ComponentClass":"ReLU",
+            "args":{}
+        },
+        {
+            "ComponentClass": "Linear",
+            "args": {
+                "in_features": 1000,
+                "out_features": 256
+            }
+        },
+        {
+            "ComponentClass":"ReLU",
+            "args":{}
+        },
+        {
+            "ComponentClass": "Linear",
+            "args": {
+                "in_features": 256,
+                "out_features": 10
+            }
+        }
+    ]
+}
