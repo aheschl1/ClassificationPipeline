@@ -80,17 +80,18 @@ class Inferer:
         model = gen.get_model().to(0)
         print('Model log args: ')
         print(gen.get_log_kwargs())
-        weights = torch.load(f"{self.lookup_root}/{self.weights}.pth")
+        map_location = {'cuda:0': f'cuda:0'}
+        weights = torch.load(f"{self.lookup_root}/{self.weights}.pth", map_location=map_location)
         model.load_state_dict(weights)
         return model
 
     def _infer_entry(self) -> Dict[str, int]:
         results = {}
-        for data, _, point in tqdm(self.dataloader, desc="Running inference"):
+        for data, _, points in tqdm(self.dataloader, desc="Running inference"):
             data = data.to(0)
             predictions = self.model(data)
             predicted_class = torch.argmax(predictions[0]).detach().item()
-            results[point.path] = predicted_class
+            results[points[0].path] = predicted_class
         return results
 
     def infer(self) -> None:
@@ -99,7 +100,6 @@ class Inferer:
         with torch.no_grad():
             results = self._infer_entry()
         print(f"Completed inference!")
-        print(results)
         print(f"Saving results to {save_path}.")
         write_json(results, save_path)
 

@@ -18,7 +18,7 @@ from torch.utils.data import DataLoader
 
 from src.utils.constants import *
 from src.utils.utils import get_dataset_name_from_id, read_json, get_dataloaders_from_fold, get_config_from_dataset, \
-    write_json, make_validation_bar_plot
+    write_json, make_validation_bar_plot, get_weights_from_dataset
 from src.json_models.src.model_generator import ModelGenerator
 from src.json_models.src.modules import ModuleStateController
 import torch.multiprocessing as mp
@@ -194,8 +194,12 @@ class Trainer:
         train_transforms = transforms.Compose([
             Resize(self.config.get('target_size', [512, 512]), antialias=True),
             transforms.RandomRotation(degrees=10),
-            transforms.RandomGrayscale(p=1),])
-        val_transforms = Resize(self.config.get('target_size', [512, 512]), antialias=True)
+            transforms.RandomGrayscale(p=1),
+        ])
+        val_transforms = transforms.Compose[
+            Resize(self.config.get('target_size', [512, 512]), antialias=True),
+            transforms.RandomGrayscale(p=1)
+        ]
         self.train_transforms = train_transforms
         return get_dataloaders_from_fold(
             self.dataset_name,
@@ -252,13 +256,13 @@ class Trainer:
             assert len(preds.shape) == 2, f"Why is the prediction or gt shape of {pred.shape}"
             results = torch.argmax(preds, dim=1) == torch.argmax(labels, dim=1)
             for label, pred in zip(torch.argmax(labels, dim=1), torch.argmax(preds, dim=1)):
-                actual_class = torch.argmax(label).cpu().item()
-                if actual_class not in results_per_label:
-                    results_per_label[actual_class] = 0
-                    total_per_label[actual_class] = 0
-                results_per_label[actual_class] += (torch.sum(label==pred)).cpu().item()
-                total_per_label[actual_class] += 1
-                print(results_per_label)
+                label = label.cpu().item()
+                pred = pred.cpu().item()
+                if label not in results_per_label:
+                    results_per_label[label] = 0
+                    total_per_label[label] = 0
+                results_per_label[label] += (1 if label == pred else 0)
+                total_per_label[label] += 1
             # case_distribution_fold
             return results.sum().item()
 
@@ -278,6 +282,8 @@ class Trainer:
             correct_count += count_correct(predictions, labels)
             total_items += batch_size
         write_json(results_per_label, f"{self.output_dir}/accuracy_per_class.json")
+        for label in results_per_label:
+            results_per_label[label] /= total_per_label[label]
         make_validation_bar_plot(results_per_label, f"{self.output_dir}/accuracy_per_class.png")
         return running_loss / total_items, correct_count / total_items
 
@@ -359,7 +365,10 @@ class Trainer:
         """
         if self.device == 0:
             path = f"{self.output_dir}/{save_name}.pth"
-            torch.save(self.model.state_dict(), path)
+            if self.world_size > 1:
+                torch.save(self.model.module.state_dict(), path)
+            else:
+                torch.save(self.model.state_dict(), path)
 
     def _get_optim(self) -> torch.optim:
         """
@@ -422,7 +431,10 @@ class Trainer:
             raise FileNotFoundError(f'The file {weights_path} does not exist. Check the weights argument.')
         map_location = {'cuda:0': f'cuda:{self.device}'}
         weights = torch.load(weights_path, map_location=map_location)
-        self.model.load_state_dict(weights)
+        if self.world_size > 1:
+            self.model.module.load_state_dict(weights)
+        else:
+            self.model.load_state_dict(weights)
         log(f"Successfully loaded weights on rank {self.device}.")
 
     def _get_loss(self) -> nn.Module:
@@ -432,7 +444,9 @@ class Trainer:
         """
         if self.device == 0:
             log("Loss being used is nn.CrossEntropyLoss()")
-        return nn.CrossEntropyLoss()
+        weights = get_weights_from_dataset(self.train_dataloader.dataset)
+        print(f"Loss using weights: {weights}")
+        return nn.CrossEntropyLoss(weight=torch.Tensor(weights).to(self.device))
 
     @property
     def data_shape(self) -> Tuple[int, int, int]:

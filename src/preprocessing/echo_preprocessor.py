@@ -183,6 +183,7 @@ class CardiacEchoViewPreprocessor(Preprocessor):
         for im_slice in data:
             case_id = uuid.uuid4()
             case_group.append(str(case_id))
+            im_slice = im_slice[:, :, 1]
             im_slice = Image.fromarray(im_slice).resize(self.target_shape)
             im_slice.save(f"{output_folder}/{case_id}.png")
         self.case_grouping.append(case_group)
