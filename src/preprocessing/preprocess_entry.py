@@ -85,7 +85,7 @@ class Preprocessor:
         """
         shape = None
         names = set()
-        for point in tqdm(self.datapoints, desc="Verifying data integrity"):
+        for point in tqdm(self.datapoints, desc="Verifying dataset integrity"):
             names_before = len(names)
             names.add(point.case_name)
             assert names_before < len(names), f"The name {point.case_name} is in the dataset at least 2 times :("
