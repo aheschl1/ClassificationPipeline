@@ -58,8 +58,6 @@ class NutrientPreprocessor(Preprocessor):
         target_folder = f"{PREPROCESSED_ROOT}/{self.dataset_name}"
         with open(f'{target_folder}/plant_name_mapping.json', 'w+') as file:
             json.dump(self.case_name_to_og_name, file)
-
-        print("Now reshaping on multithread")
         self.reshape_images()
         super().process()
 
@@ -72,7 +70,7 @@ class NutrientPreprocessor(Preprocessor):
 
         paths = glob.glob(path)
         with Pool(self.processes) as pool:
-            with tqdm(total=len(paths)) as pbar:
+            with tqdm(total=len(paths), desc="Reshaping images") as pbar:
                 for _ in pool.imap(NutrientPreprocessor._reshape_single, paths):
                     pbar.update()
 

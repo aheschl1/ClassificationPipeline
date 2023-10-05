@@ -7,7 +7,7 @@ sys.path.append("/home/student/andrew/Documents/ClassificationPipeline")
 import logging
 import os.path
 import time
-from typing import Tuple
+from typing import Tuple, Any
 from torch.optim.lr_scheduler import ExponentialLR
 import click
 import multiprocessing_logging  # for multiprocess logging https://github.com/jruere/multiprocessing-logging
@@ -18,7 +18,7 @@ from torch.utils.data import DataLoader
 
 from src.utils.constants import *
 from src.utils.utils import get_dataset_name_from_id, read_json, get_dataloaders_from_fold, get_config_from_dataset, \
-    write_json, make_validation_bar_plot, get_weights_from_dataset
+    write_json, make_validation_bar_plot, get_weights_from_dataset, get_preprocessed_datapoints
 from src.json_models.src.model_generator import ModelGenerator
 from src.json_models.src.modules import ModuleStateController
 import torch.multiprocessing as mp
@@ -186,11 +186,45 @@ class Trainer:
             print(f"Sending logging and outputs to {output_dir}")
         return output_dir
 
+    def _get_mean_std(self) -> Tuple[Any, Any]:
+        """
+        This method stub should be used if you want to normalize outside of preprocessing.
+
+        You can use:
+        src.utils.utils.get_preprocessed_datapoints(self.dataset_name, self.fold) -> [train datapoints, val datapoints]
+
+        Also check src.utils.normalizer, that may help you!
+        It is written to just calculate train and val sets mean and std.
+
+        Untested.
+        :return: mean and std
+        """
+        import numpy as np
+        train_points, _ = get_preprocessed_datapoints(self.dataset_name, self.fold)
+
+        class SmallLoader:
+            def __init__(self, train_points_internal):
+                self.train_points_internal = train_points_internal
+                self.i = -1
+
+            def __iter__(self):
+                self.i = -1
+                return self
+
+            def __next__(self):
+                self.i += 1
+                return np.expand_dims(self.train_points_internal[self.i].get_data(), axis=0)
+
+        train_normalize_loader = train_points[0].normalizer(SmallLoader(train_points), active=True)
+        return train_normalize_loader.mean, train_normalize_loader.std
+
     def _get_dataloaders(self) -> Tuple[DataLoader, DataLoader]:
         """
         This method is responsible for creating the augmentation and then fetching dataloaders.
         :return: Train and val dataloaders.
         """
+        # Uncomment this if you want to figure out the mean and std of the train set
+        # mean, std = self._get_mean_std()
         train_transforms = transforms.Compose([
             Resize(self.config.get('target_size', [512, 512]), antialias=True),
             transforms.RandomRotation(degrees=20),
@@ -254,7 +288,8 @@ class Trainer:
             :param labels: The second tensor
             :return: Count of agreement at dim 1
             """
-            assert preds.shape == labels.shape, f"Tensor a and b are different shapes. Got {preds.shape} and {labels.shape}"
+            assert preds.shape == labels.shape, (f"Tensor a and b are different shapes. "
+                                                 f"Got {preds.shape} and {labels.shape}")
             assert len(preds.shape) == 2, f"Why is the prediction or gt shape of {pred.shape}"
             results = torch.argmax(preds, dim=1) == torch.argmax(labels, dim=1)
             for label, pred in zip(torch.argmax(labels, dim=1), torch.argmax(preds, dim=1)):
