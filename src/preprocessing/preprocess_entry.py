@@ -48,9 +48,9 @@ class Preprocessor:
         label_to_id_mapping, id_to_label_mapping = self.map_labels_to_id(return_inverse=True)
         write_json(label_to_id_mapping, f"{PREPROCESSED_ROOT}/{self.dataset_name}/label_to_id.json")
         write_json(id_to_label_mapping, f"{PREPROCESSED_ROOT}/{self.dataset_name}/id_to_label.json")
-        # Label stuff done, start with fetching data. We will also save a case to label mapping.
         self.datapoints = get_raw_datapoints(self.dataset_name, label_to_id_mapping)
-        self.assert_all_images_same_shape()
+        self.verify_dataset_integrity()
+        # Label stuff done, start with fetching data. We will also save a case to label mapping.
         case_to_label_mapping = self.get_case_to_label_mapping()
         write_json(case_to_label_mapping, f"{PREPROCESSED_ROOT}/{self.dataset_name}/case_label_mapping.json")
         splits_map = self.get_folds(self.folds)
@@ -78,13 +78,17 @@ class Preprocessor:
         }
         write_json(config, f"{PREPROCESSED_ROOT}/{self.dataset_name}/config.json")
 
-    def assert_all_images_same_shape(self) -> None:
+    def verify_dataset_integrity(self) -> None:
         """
         Ensures that all datapoints have the same shape.
         :return:
         """
         shape = None
+        names = set()
         for point in tqdm(self.datapoints, desc="Verifying data integrity"):
+            names_before = len(names)
+            names.add(point.case_name)
+            assert names_before < len(names), f"The name {point.case_name} is in the dataset at least 2 times :("
             point = point.get_data()
             if shape is None:
                 shape = point.shape
@@ -175,9 +179,11 @@ class Preprocessor:
 
 def get_preprocessor_from_name(name: str) -> Type[Preprocessor]:
     from src.preprocessing.echo_preprocessor import CardiacEchoViewPreprocessor
+    from src.preprocessing.nutrient_preprocessor import NutrientPreprocessor
     return {
         ECHO: CardiacEchoViewPreprocessor,
-        BASE: Preprocessor
+        BASE: Preprocessor,
+        NUTRIENT: NutrientPreprocessor
     }[name]
 
 
@@ -189,9 +195,10 @@ def get_preprocessor_from_name(name: str) -> Type[Preprocessor]:
 @click.option('-preprocessor', help="Identifier of the preprocessor you want to use", default='base')  # echo
 @click.option('-cardiac_data_root', help="The data root for cardiac data.", required=False)  # echo
 @click.option('-cardiac_csv_path', help="The path to label csv for cardiac data.", required=False)  # echo
+@click.option('-nutrient_data_root', help="The data root for nutrient data.", required=False)  # nutrient
 def main(folds: int, processes: int, normalize: bool, dataset_id: str, preprocessor: str,
-         cardiac_data_root: str, cardiac_csv_path: str):
-    assert preprocessor in [BASE, ECHO], f"Only {BASE} and {ECHO} are supported preprocessors."
+         cardiac_data_root: str, cardiac_csv_path: str, nutrient_data_root:str):
+    assert preprocessor in [BASE, ECHO, NUTRIENT], f"Only {BASE} and {ECHO} and {NUTRIENT} are supported preprocessors."
     assert not preprocessor == ECHO or (cardiac_data_root is not None and cardiac_csv_path is not None), \
         "You specified echo preprocessor which requires cardiac_data_root and cardiac_csv_path arguments."
     preprocessor = get_preprocessor_from_name(preprocessor)
@@ -201,7 +208,8 @@ def main(folds: int, processes: int, normalize: bool, dataset_id: str, preproces
         folds=folds,
         processes=processes,
         data_root=cardiac_data_root,
-        csv_path=cardiac_csv_path
+        csv_path=cardiac_csv_path,
+        nutrient_data_root=nutrient_data_root
     )
     preprocessor.process()
     print("Preprocessing completed!")

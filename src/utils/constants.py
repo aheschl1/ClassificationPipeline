@@ -24,6 +24,7 @@ INSTANCE = 'instance'
 BATCH = "batch"
 BASE = 'base'
 ECHO = 'echo'
+NUTRIENT = 'nutrient'
 PATIENT_PATH = "patient_path"
 FILE_NAME = "file_name"
 INSTANCE_NUMBER = "InstanceNumber"
