@@ -23,7 +23,7 @@ from overrides import override
 
 class CardiacEchoViewPreprocessor(Preprocessor):
     def __init__(self, dataset_id: str, folds: int, processes: int, normalize: bool,
-                 csv_path: str, data_root: str):
+                 csv_path: str, data_root: str, **kwargs):
         """
         Cardiac view preprocessor subclass. Transforms data from original format to this pipelines format.
         Also converts data to 2d slices, and applies movement mask.
@@ -137,15 +137,6 @@ class CardiacEchoViewPreprocessor(Preprocessor):
                 "val": val_cases
             }
         }
-
-    @override
-    def assert_all_images_same_shape(self) -> None:
-        """
-        Ensures that all datapoints have the same shape.
-        Overwritten because we reshape in this subclass.
-        :return:
-        """
-        ...
 
     def _build_output_folder(self) -> None:
         """

@@ -93,12 +93,11 @@ def get_raw_datapoints(dataset_name: str, label_to_id_mapping: Dict[str, int]) -
     return datapoints
 
 
-def get_preprocessed_datapoints(dataset_name: str, label_to_id_mapping: Dict[str, int], fold: int) \
+def get_preprocessed_datapoints(dataset_name: str, fold: int) \
         -> Tuple[List[Datapoint], List[Datapoint]]:
     """
     Returns the datapoints of preprocessed cases.
     :param dataset_name:
-    :param label_to_id_mapping:
     :param fold:
     :return: Train points, Val points.
     """
@@ -250,9 +249,8 @@ def get_dataloaders_from_fold(dataset_name: str, fold: int,
     """
     config = get_config_from_dataset(dataset_name)
 
-    train_points, val_points = get_preprocessed_datapoints(dataset_name, get_label_mapping_from_dataset(dataset_name),
-                                                           fold) \
-        if preprocessed_data else get_raw_datapoints_folded(dataset_name, fold)
+    train_points, val_points = get_preprocessed_datapoints(dataset_name, fold) if preprocessed_data else (
+        get_raw_datapoints_folded(dataset_name, fold))
 
     train_dataset = PipelineDataset(train_points, train_transforms,
                                     store_metadata=store_metadata, preload=preload,
