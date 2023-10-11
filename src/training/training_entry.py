@@ -13,7 +13,7 @@ import click
 import multiprocessing_logging  # for multiprocess logging https://github.com/jruere/multiprocessing-logging
 import torch
 import torch.nn as nn
-from torch.optim import SGD
+from torch.optim import SGD, Adam
 from torch.utils.data import DataLoader
 
 from src.utils.constants import *
@@ -226,10 +226,7 @@ class Trainer:
         # Uncomment this if you want to figure out the mean and std of the train set
         # mean, std = self._get_mean_std()
         train_transforms = transforms.Compose([
-            transforms.RandomChoice([
-                Resize(self.config.get('target_size', [512, 512]), antialias=True),
-                transforms.RandomCrop(self.config.get('target_size', [512, 512]))
-            ]),
+            Resize(self.config.get('target_size', [512, 512]), antialias=True),
             transforms.RandomRotation(degrees=10),
             transforms.RandomGrayscale(p=1),
             transforms.RandomAdjustSharpness(1.5),
@@ -417,11 +414,11 @@ class Trainer:
         :return: Optimizer object.
         """
         if self.device == 0:
-            log(f"Optim being used is SGD")
-        return SGD(
+            log(f"Optim being used is Adam")
+        return Adam(
             self.model.parameters(),
             lr=self.config['lr'],
-            momentum=self.config.get('momentum', 0.9),
+            # momentum=self.config.get('momentum', 0.9),
             weight_decay=self.config.get('weight_decay', 0)
         )
 
