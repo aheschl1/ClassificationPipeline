@@ -71,7 +71,7 @@ class NutrientPreprocessor(Preprocessor):
         paths = glob.glob(path)
         with Pool(self.processes) as pool:
             with tqdm(total=len(paths), desc="Reshaping images") as pbar:
-                for _ in pool.imap(NutrientPreprocessor._reshape_single, paths):
+                for _ in pool.imap_unordered(NutrientPreprocessor._reshape_single, paths):
                     pbar.update()
 
     @staticmethod
@@ -88,7 +88,7 @@ class NutrientPreprocessor(Preprocessor):
         Prepares the output folder for usage.
         :return: Nothing
         """
-        self.raw_root = f"{DATA_ROOT}/raw/{self.dataset_name}"
+        self.raw_root = f"{RAW_ROOT}/{self.dataset_name}"
         shutil.rmtree(self.raw_root)
         assert not os.path.exists(self.raw_root), ("The raw data root already exists. "
                                                    "Try a new dataset name, or delete the folder.")

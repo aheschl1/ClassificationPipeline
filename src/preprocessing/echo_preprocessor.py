@@ -19,6 +19,7 @@ import glob
 from typing import Dict
 from sklearn.model_selection import train_test_split
 from overrides import override
+from tqdm import tqdm
 
 
 class CardiacEchoViewPreprocessor(Preprocessor):
@@ -40,6 +41,7 @@ class CardiacEchoViewPreprocessor(Preprocessor):
         self.data_info = pd.read_excel(csv_path)
         self.data_root = data_root
         self.case_grouping = []
+        self.patient_grouping = {}
         self.uuid_case_mapping = None
         self.target_shape = (800, 600)
 
@@ -54,10 +56,13 @@ class CardiacEchoViewPreprocessor(Preprocessor):
         _, row_series = zip(*self.data_info.iterrows())
         data = [row for _, row in
                 enumerate(row_series)]
+
         with ThreadPool(self.processes) as pool:
-            pool.map(self._process_case, data)
+            with tqdm(total=len(data), desc="Processing cases") as pbar:
+                for _ in pool.imap_unordered(self._process_case, data):
+                    pbar.update()
         # rename cases to be correct
-        cases = glob.glob(f"{DATA_ROOT}/raw/{self.dataset_name}/**/*.png", recursive=True)
+        cases = glob.glob(f"{RAW_ROOT}/{self.dataset_name}/**/*.png", recursive=True)
         uuid_case_mapping = {}
         for current_case, path in enumerate(cases):
             case_name = get_case_name_from_number(current_case)
@@ -106,6 +111,7 @@ class CardiacEchoViewPreprocessor(Preprocessor):
             class_distribution_fold(fold, folds[fold])
 
     def _save_case_grouping(self):
+        # case grouping
         information = []
         for group in self.case_grouping:
             case_group = []
@@ -113,6 +119,14 @@ class CardiacEchoViewPreprocessor(Preprocessor):
                 case_group.append(self.uuid_case_mapping[case])
             information.append(case_group)
         write_json(information, f"{PREPROCESSED_ROOT}/{self.dataset_name}/case_grouping.json")
+        # patient grouping
+        information = []
+        for group in self.patient_grouping.values():
+            case_group = []
+            for case in group:
+                case_group.append(self.uuid_case_mapping[case])
+            information.append(case_group)
+        write_json(information, f"{PREPROCESSED_ROOT}/{self.dataset_name}/patient_grouping.json")
 
     @override
     def get_folds(self, k: int) -> Dict[int, Dict[str, list]]:
@@ -122,8 +136,7 @@ class CardiacEchoViewPreprocessor(Preprocessor):
         :return: Folds map
         """
         assert k == 1, "Echo preprocessor can only do one fold right now. The dev sucked too much"
-
-        train_groups, test_groups = train_test_split(self.case_grouping, random_state=42, shuffle=True)
+        train_groups, test_groups = train_test_split(list(self.patient_grouping.values()), train_size=0.8, random_state=42, shuffle=True)
         train_cases, val_cases = [], []
         for group in train_groups:
             for case in group:
@@ -143,7 +156,7 @@ class CardiacEchoViewPreprocessor(Preprocessor):
         Prepares the output folder for usage.
         :return: Nothing
         """
-        raw_root = f"{DATA_ROOT}/raw/{self.dataset_name}"
+        raw_root = f"{RAW_ROOT}/{self.dataset_name}"
         shutil.rmtree(raw_root)
         assert not os.path.exists(raw_root), ("The raw data root already exists. "
                                               "Try a new dataset name, or delete the folder.")
@@ -156,7 +169,9 @@ class CardiacEchoViewPreprocessor(Preprocessor):
         """
         if '-D' in row[LABEL]:
             row[LABEL] = row[LABEL].replace('-D', '')
-        output_folder = f"{DATA_ROOT}/raw/{self.dataset_name}/{row[LABEL]}"
+        if row[PATIENT_PATH] not in self.patient_grouping:
+            self.patient_grouping[row[PATIENT_PATH]] = []
+        output_folder = f"{RAW_ROOT}/{self.dataset_name}/{row[LABEL]}"
         # create the labels folder
         try:
             os.mkdir(output_folder)
@@ -167,18 +182,17 @@ class CardiacEchoViewPreprocessor(Preprocessor):
         if not os.path.exists(data_path):
             print(f"Skipping {row[PATIENT_PATH]}/{row[FILE_NAME]}. DNE")
             return
-        print(f"Working on {row[PATIENT_PATH]}/{row[FILE_NAME]}")
         data = CardiacEchoViewPreprocessor._read_dicom(data_path)
         data = CardiacEchoViewPreprocessor._apply_movement_mask(data)
         case_group = []
         for im_slice in data:
             case_id = uuid.uuid4()
             case_group.append(str(case_id))
+            self.patient_grouping[row[PATIENT_PATH]].append(str(case_id))
             im_slice = im_slice[:, :, 1]
             im_slice = Image.fromarray(im_slice).resize(self.target_shape)
             im_slice.save(f"{output_folder}/{case_id}.png")
         self.case_grouping.append(case_group)
-        print(f"Completed {row[PATIENT_PATH]}/{row[FILE_NAME]}!")
 
     @staticmethod
     def _apply_movement_mask(image_array: np.array, k: int = 100) -> np.array:

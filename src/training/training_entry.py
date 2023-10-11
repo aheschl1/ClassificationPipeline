@@ -226,11 +226,15 @@ class Trainer:
         # Uncomment this if you want to figure out the mean and std of the train set
         # mean, std = self._get_mean_std()
         train_transforms = transforms.Compose([
-            Resize(self.config.get('target_size', [512, 512]), antialias=True),
-            transforms.RandomRotation(degrees=20),
+            transforms.RandomChoice([
+                Resize(self.config.get('target_size', [512, 512]), antialias=True),
+                transforms.RandomCrop(self.config.get('target_size', [512, 512]))
+            ]),
+            transforms.RandomRotation(degrees=10),
             transforms.RandomGrayscale(p=1),
             transforms.RandomAdjustSharpness(1.5),
-            transforms.RandomVerticalFlip(p=0.25)
+            transforms.RandomVerticalFlip(p=0.25,),
+            transforms.RandomHorizontalFlip(p=0.25,),
         ])
         val_transforms = transforms.Compose([
             Resize(self.config.get('target_size', [512, 512]), antialias=True),
