@@ -3,14 +3,23 @@ import os
 SIMPLE_ITK = 'SimpleITK'
 NATURAL = 'NATURAL'
 CT = 'CT'
-DATA_ROOT = os.getenv('DATASET_ROOT')
-if DATA_ROOT is None or not os.path.exists(DATA_ROOT):
-    raise NotADirectoryError('You must define $DATASET_ROOT in your environment variables '
+
+RAW_ROOT = os.getenv('RAW_ROOT')
+if RAW_ROOT is None or not os.path.exists(RAW_ROOT):
+    raise NotADirectoryError('You must define $RAW_ROOT in your environment variables '
                              '(in ~/.bashrc or ~/.profile), and make sure that the path exists.')
 
-RAW_ROOT = f"{DATA_ROOT}/raw"
-PREPROCESSED_ROOT = f"{DATA_ROOT}/preprocessed"
-RESULTS_ROOT = f"{DATA_ROOT}/results"
+PREPROCESSED_ROOT = os.getenv('PREPROCESSED_ROOT')
+if PREPROCESSED_ROOT is None or not os.path.exists(PREPROCESSED_ROOT):
+    raise NotADirectoryError('You must define $PREPROCESSED_ROOT in your environment variables '
+                             '(in ~/.bashrc or ~/.profile), and make sure that the path exists.')
+
+RESULTS_ROOT = os.getenv('RESULTS_ROOT')
+if RESULTS_ROOT is None or not os.path.exists(RESULTS_ROOT):
+    raise NotADirectoryError('You must define $RESULTS_ROOT in your environment variables '
+                             '(in ~/.bashrc or ~/.profile), and make sure that the path exists.')
+
+
 ENB6 = 'enb6'
 ENB4 = 'enb4'
 ENV2 = 'env2'
