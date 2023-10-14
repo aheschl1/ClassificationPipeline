@@ -3,6 +3,7 @@ from typing import List, Callable, Tuple
 import torch
 from torch.utils.data import Dataset
 from src.dataloading.datapoint import Datapoint
+from src.utils.constants import SEGMENTATION, CLASSIFICATION
 
 
 class PipelineDataset(Dataset):
@@ -10,9 +11,7 @@ class PipelineDataset(Dataset):
     def __init__(self,
                  datapoints: List[Datapoint],
                  transforms: Callable = None,
-                 store_metadata: bool = False,
-                 preload: bool = False,
-                 dataset_type: str = "train"
+                 store_metadata: bool = False
                  ):
         """
         Custom dataset for this pipeline.
@@ -24,8 +23,7 @@ class PipelineDataset(Dataset):
         self.transforms = transforms
         self.store_metadata = store_metadata
         self.num_classes = self._get_number_of_classes()
-        self.preload = preload
-        self.dataset_type = dataset_type
+        self.dataset_type = datapoints[0].dataset_type
 
     def _get_number_of_classes(self):
         """
@@ -44,6 +42,7 @@ class PipelineDataset(Dataset):
         """
         return len(self.datapoints)
 
+    # TODO deal with segmentation augmentation
     def __getitem__(self, idx) -> Tuple[torch.Tensor, Datapoint]:
         """
         Loads the data from the index and transforms it.
@@ -53,10 +52,20 @@ class PipelineDataset(Dataset):
 
         point = self.datapoints[idx]
         data = point.get_data(store_metadata=self.store_metadata, )
-
+        mask = None
+        if self.dataset_type == SEGMENTATION:
+            mask = data[1]
+            data = data[0]
         if not isinstance(data, torch.Tensor):
             data = torch.from_numpy(data)
+        if mask is not None and not isinstance(mask, torch.Tensor):
+            mask = torch.from_numpy(mask)
+
         if self.transforms is not None:
+            assert self.dataset_type == CLASSIFICATION, "Transformations have not yet been implemented for segmentation."
             data = self.transforms(data)
         point.set_num_classes(self.num_classes)
+        # bundle properly for segmentation
+        if self.dataset_type == SEGMENTATION:
+            data = (data, mask)
         return data, point

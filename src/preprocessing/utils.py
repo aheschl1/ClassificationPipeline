@@ -6,14 +6,14 @@ from typing import List
 from src.utils.constants import PREPROCESSED_ROOT, RAW_ROOT
 
 
-def maybe_make_preprocessed(dataset: str, query_overwrite: bool = True) -> None:
+def maybe_make_preprocessed(dataset_name: str, query_overwrite: bool = True) -> None:
     """
     Checks if the preprocessed folder should be made for a dataset. Makes it if needed.
-    :param dataset: Dataset name
+    :param dataset_name: Dataset name
     :param query_overwrite: Whether to ask before overwriting.
     :return: None
     """
-    target_folder = f"{PREPROCESSED_ROOT}/{dataset}"
+    target_folder = f"{PREPROCESSED_ROOT}/{dataset_name}"
     if os.path.exists(target_folder):
         remove = input(f"Warning! You are about to overwrite the existing path {target_folder}. Continue? (y/n): ") \
                  == "y" if query_overwrite else True

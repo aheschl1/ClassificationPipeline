@@ -43,3 +43,6 @@ ENDOCARDIAL_QUALITY = "endocardial_quality"
 AXIS_QUALITY = "axis_quality"
 STRUCTURE_QUALITY = "structure_quality"
 QUALITY_SUM = "quality_sum"
+
+SEGMENTATION = "segmentation"
+CLASSIFICATION = "classification"

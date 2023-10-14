@@ -7,7 +7,7 @@ import torch
 from torch.utils.data import DataLoader
 from src.dataloading.datapoint import Datapoint
 from src.dataloading.dataset import PipelineDataset
-from src.utils.constants import PREPROCESSED_ROOT, RAW_ROOT
+from src.utils.constants import PREPROCESSED_ROOT, RAW_ROOT, CLASSIFICATION, SEGMENTATION
 import matplotlib.pyplot as plt
 
 
@@ -74,22 +74,36 @@ def verify_case_name(case_name: str) -> None:
                                                "should be format case_xxxxx."
 
 
-def get_raw_datapoints(dataset_name: str, label_to_id_mapping: Dict[str, int]) -> List[Datapoint]:
+def get_raw_datapoints(dataset_name: str, label_to_id_mapping: Dict[str, int] = None) -> List[Datapoint]:
     """
     Given the name of a dataset, gets a list of datapoint objects.
     :param dataset_name: The name of the dataset.
     :param label_to_id_mapping: The label to id mapping for converting label name to number.
     :return: List of datapoints in the dataset.
     """
-    dataset_root = f"{RAW_ROOT}/{dataset_name}/*/**"
-    sample_paths = glob.glob(dataset_root)
+    dataset_type = get_dataset_type(dataset_name)
+    if dataset_type == CLASSIFICATION:
+        assert label_to_id_mapping is not None, ("Since this is a classification dataset, expected label_to_id_mapping"
+                                                 " not to be None.")
+    else:
+        assert label_to_id_mapping is None, ("Since this is a segmentation dataset, expected label_to_id_mapping "
+                                             "to be None.")
+
+    dataset_root = f"{RAW_ROOT}/{dataset_name}"
     datapoints = []
+    if dataset_type == CLASSIFICATION:
+        sample_paths = glob.glob(f"{dataset_root}/*/**")
+    else:
+        # Look only at images for segmentation
+        sample_paths = glob.glob(f"{dataset_root}/imagesTr/*")
+
     for path in sample_paths:
-        label = path.split('/')[-2]
-        label = label_to_id_mapping[label]
-        name = path.split('/')[-1].split('.')[0]
-        verify_case_name(name)
-        datapoints.append(Datapoint(path, label, case_name=name, dataset_name=dataset_name))
+        # -12 is the label for segmentation to ensure intentionality when building points
+        label = label_to_id_mapping[path.split('/')[-2]] if dataset_type == CLASSIFICATION else -12
+        case_name = path.split('/')[-1].split('.')[0]
+        verify_case_name(case_name)
+        datapoints.append(Datapoint(path, label, case_name=case_name, dataset_name=dataset_name))
+
     return datapoints
 
 
@@ -101,16 +115,23 @@ def get_preprocessed_datapoints(dataset_name: str, fold: int) \
     :param fold:
     :return: Train points, Val points.
     """
-    train_root = f"{PREPROCESSED_ROOT}/{dataset_name}/fold_{fold}/train/*"
-    train_paths = glob.glob(train_root)
-    val_root = f"{PREPROCESSED_ROOT}/{dataset_name}/fold_{fold}/val/*"
-    val_paths = glob.glob(val_root)
+    train_root = f"{PREPROCESSED_ROOT}/{dataset_name}/fold_{fold}/train"
+    val_root = f"{PREPROCESSED_ROOT}/{dataset_name}/fold_{fold}/val"
+    dataset_type = get_dataset_type(dataset_name)
+    if dataset_type == CLASSIFICATION:
+        val_paths = glob.glob(f"{val_root}/*")
+        train_paths = glob.glob(f"{train_root}/*")
+    else:
+        val_paths = glob.glob(f"{val_root}/imagesTr/*")
+        train_paths = glob.glob(f"{train_root}/imagesTr/*")
+
     sample_paths = val_paths + train_paths
-    label_case_mapping = get_label_case_mapping_from_dataset(dataset_name)
     train_datapoints, val_datapoints = [], []
+    label_case_mapping = get_label_case_mapping_from_dataset(dataset_name) if dataset_type == CLASSIFICATION else None
     for path in sample_paths:
         name = path.split('/')[-1].split('.')[0]
-        label = label_case_mapping[name]
+        # -12 is sentinel value for segmentation labels to ensure intention.
+        label = -12 if dataset_type == SEGMENTATION else label_case_mapping[name]
         verify_case_name(name)
         if path in val_paths:
             val_datapoints.append(Datapoint(path, label, case_name=name, dataset_name=dataset_name))
@@ -127,8 +148,10 @@ def get_raw_datapoints_folded(dataset_name: str, fold: int) -> Tuple[List[Datapo
     :return: Train and val points.
     """
     fold = get_folds_from_dataset(dataset_name)[str(fold)]
-
-    datapoints = get_raw_datapoints(dataset_name, get_label_mapping_from_dataset(dataset_name))
+    if get_dataset_type(dataset_name) == CLASSIFICATION:
+        datapoints = get_raw_datapoints(dataset_name, get_label_mapping_from_dataset(dataset_name))
+    else:
+        datapoints = get_raw_datapoints(dataset_name)
     train_points, val_points = [], []
     # Now we populate the train and val lists
     for point in datapoints:
@@ -196,20 +219,22 @@ def batch_collate_fn(batch: List[Tuple[torch.Tensor, Datapoint]]) -> Tuple[torch
     :param batch: List of data points from loader.
     :return: Batched tensor data, labels, and list of datapoints.
     """
-    data = []
-    labels = []
-    num_classes = batch[0][1].num_classes
-    points = []
-    assert num_classes is not None, "All datapoints should have the property " \
-                                    "num_classes set before collate_fn. womp womp"
+    images, labels, points = [], [], []
+    dataset_type = batch[0][1].dataset_type
+    num_classes = batch[0][1].num_classes if dataset_type == CLASSIFICATION else None
+
     for data_point, point in batch:
-        data.append(data_point)
+        if dataset_type == CLASSIFICATION:
+            label = torch.zeros(num_classes)
+            label[point.label] = 1
+        else:
+            label = data_point[1]
+            data_point = data_point[0]
+        images.append(data_point)
         points.append(point)
-        label = torch.zeros(num_classes)
-        label[point.label] = 1
         labels.append(label)
 
-    return torch.stack(data), torch.stack(labels), points
+    return torch.stack(images), torch.stack(labels), points
 
 
 def make_validation_bar_plot(results: Dict[int, int], output_path: str):
@@ -230,14 +255,13 @@ def make_validation_bar_plot(results: Dict[int, int], output_path: str):
 
 
 def get_dataloaders_from_fold(dataset_name: str, fold: int,
-                              train_transforms=None, val_transforms=None,
+                              train_transforms=None,
+                              val_transforms=None,
                               preprocessed_data: bool = True,
                               store_metadata: bool = False,
-                              preload: bool = True,
                               **kwargs) -> Tuple[DataLoader, DataLoader]:
     """
     Returns the train and val dataloaders for a specific dataset fold.
-    :param preload: Weather or not the datasets should preload images.
     :param dataset_name: The name of the dataset.
     :param fold: The fold to grab.
     :param train_transforms: The transforms to apply to training data.
@@ -249,15 +273,13 @@ def get_dataloaders_from_fold(dataset_name: str, fold: int,
     """
     config = get_config_from_dataset(dataset_name)
 
-    train_points, val_points = get_preprocessed_datapoints(dataset_name, fold) if preprocessed_data else (
-        get_raw_datapoints_folded(dataset_name, fold))
+    train_points, val_points = get_preprocessed_datapoints(dataset_name, fold) if preprocessed_data \
+        else get_raw_datapoints_folded(dataset_name, fold)
 
     train_dataset = PipelineDataset(train_points, train_transforms,
-                                    store_metadata=store_metadata, preload=preload,
-                                    dataset_type="train")
+                                    store_metadata=store_metadata)
     val_dataset = PipelineDataset(val_points, val_transforms,
-                                  store_metadata=store_metadata, preload=preload,
-                                  dataset_type="val")
+                                  store_metadata=store_metadata)
     train_sampler, val_sampler = None, None
     if 'sampler' in kwargs and kwargs['sampler'] is not None:
         assert 'rank' in kwargs and 'world_size' in kwargs, \
@@ -310,3 +332,21 @@ def get_weights_from_dataset(dataset: PipelineDataset) -> List[float]:
     total = sum(weights)
     weights = [1. - (weight / total) + 1 for weight in weights]
     return weights
+
+
+def get_dataset_type(dataset_name: str) -> Union[SEGMENTATION, CLASSIFICATION]:
+    """
+    Returns the type of dataset.
+    If the two folders under the raw root are exactly imagesTr and labelsTr, it is segmentation.
+    :param dataset_name: The dataset to check
+    :return: segmentation or classification
+    """
+    raw_root = f"{RAW_ROOT}/{dataset_name}"
+    folders = [folder.split('/')[-1] for folder in glob.glob(f"{raw_root}/*")]
+    if len(folders) == 2 and "imagesTr" in folders and "labelsTr" in folders:
+        return SEGMENTATION
+    return CLASSIFICATION
+
+
+if __name__ == "__main__":
+    print(get_dataset_type("Dataset_001"))
