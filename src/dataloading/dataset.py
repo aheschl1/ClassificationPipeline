@@ -3,7 +3,6 @@ from typing import List, Callable, Tuple
 import torch
 from torch.utils.data import Dataset
 from src.dataloading.datapoint import Datapoint
-from src.utils.constants import SEGMENTATION, CLASSIFICATION
 
 
 class PipelineDataset(Dataset):
@@ -11,7 +10,9 @@ class PipelineDataset(Dataset):
     def __init__(self,
                  datapoints: List[Datapoint],
                  transforms: Callable = None,
-                 store_metadata: bool = False
+                 store_metadata: bool = False,
+                 preload: bool = False,
+                 dataset_type: str = "train"
                  ):
         """
         Custom dataset for this pipeline.
@@ -23,7 +24,8 @@ class PipelineDataset(Dataset):
         self.transforms = transforms
         self.store_metadata = store_metadata
         self.num_classes = self._get_number_of_classes()
-        self.dataset_type = datapoints[0].dataset_type
+        self.preload = preload
+        self.dataset_type = dataset_type
 
     def _get_number_of_classes(self):
         """
@@ -42,7 +44,6 @@ class PipelineDataset(Dataset):
         """
         return len(self.datapoints)
 
-    # TODO deal with segmentation augmentation
     def __getitem__(self, idx) -> Tuple[torch.Tensor, Datapoint]:
         """
         Loads the data from the index and transforms it.
@@ -52,33 +53,10 @@ class PipelineDataset(Dataset):
 
         point = self.datapoints[idx]
         data = point.get_data(store_metadata=self.store_metadata, )
-        mask = None
-        transform_package = {}
-        if self.dataset_type == SEGMENTATION:
-            mask = data[1]
-            data = data[0]
-        # tensor
+
         if not isinstance(data, torch.Tensor):
             data = torch.from_numpy(data)
-        if mask is not None and not isinstance(mask, torch.Tensor):
-            mask = torch.from_numpy(mask)
-        # transforms
         if self.transforms is not None:
-            if self.dataset_type == SEGMENTATION:
-                transform_package['image'] = data.unsqueeze(0)
-                transform_package['mask'] = mask.unsqueeze(0)
-            else:
-                transform_package = data    
-            transform_out = self.transforms(transform_package)
-            if self.dataset_type == SEGMENTATION:
-                mask = transform_out['mask'].squeeze(0)
-                data = transform_out['image'].squeeze(0)
-            else:
-                data = transform_package
+            data = self.transforms(data)
         point.set_num_classes(self.num_classes)
-        # one hot target mask
-
-        # bundle properly for segmentation
-        if self.dataset_type == SEGMENTATION:
-            data = (data, mask)
         return data, point

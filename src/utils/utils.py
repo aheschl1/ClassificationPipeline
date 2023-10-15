@@ -219,22 +219,20 @@ def batch_collate_fn(batch: List[Tuple[torch.Tensor, Datapoint]]) -> Tuple[torch
     :param batch: List of data points from loader.
     :return: Batched tensor data, labels, and list of datapoints.
     """
-    images, labels, points = [], [], []
-    dataset_type = batch[0][1].dataset_type
-    num_classes = batch[0][1].num_classes if dataset_type == CLASSIFICATION else None
-
+    data = []
+    labels = []
+    num_classes = batch[0][1].num_classes
+    points = []
+    assert num_classes is not None, "All datapoints should have the property " \
+                                    "num_classes set before collate_fn. womp womp"
     for data_point, point in batch:
-        if dataset_type == CLASSIFICATION:
-            label = torch.zeros(num_classes)
-            label[point.label] = 1
-        else:
-            label = data_point[1]
-            data_point = data_point[0]
-        images.append(data_point)
+        data.append(data_point)
         points.append(point)
+        label = torch.zeros(num_classes)
+        label[point.label] = 1
         labels.append(label)
 
-    return torch.stack(images), torch.stack(labels), points
+    return torch.stack(data), torch.stack(labels), points
 
 
 def make_validation_bar_plot(results: Dict[int, int], output_path: str):
