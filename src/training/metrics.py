@@ -51,7 +51,9 @@ class Accuracy(PipelineMetric):
         :return: Total correct, results per label, total per label
         """
         metric = self.correct_count/self.total_items, self.results_per_label, self.total_per_label
-        self.__init__()
+        self.correct_count, self.total_items = 0, 0
+        self.results_per_label = {}
+        self.total_per_label = {}
         return metric
 
 

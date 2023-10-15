@@ -63,16 +63,18 @@ class PipelineDataset(Dataset):
         if mask is not None and not isinstance(mask, torch.Tensor):
             mask = torch.from_numpy(mask)
         # transforms
-        transform_package['image'] = data
         if self.transforms is not None:
             if self.dataset_type == SEGMENTATION:
-                transform_package['image'] = transform_package['image'].unsqueeze(0)
+                transform_package['image'] = data.unsqueeze(0)
                 transform_package['mask'] = mask.unsqueeze(0)
+            else:
+                transform_package = data    
             transform_out = self.transforms(transform_package)
-            data = transform_out['image']
             if self.dataset_type == SEGMENTATION:
                 mask = transform_out['mask'].squeeze(0)
-                data = data.squeeze(0)
+                data = transform_out['image'].squeeze(0)
+            else:
+                data = transform_package
         point.set_num_classes(self.num_classes)
         # one hot target mask
 

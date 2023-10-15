@@ -258,15 +258,17 @@ class Trainer:
             return self._get_segmentation_augmentations()
 
     def _get_classification_augmentations(self):
-        train = transforms_m.Compose([
-            transforms_m.ResizeD(keys=['image'], spatial_size=self.config.get('target_size', [512, 512])),
-            transforms_m.LambdaD(keys='image', func=lambda x: transforms.Grayscale()(x)),
-            transforms_m.RandRotateD(keys=['image'], range_x=10),
-            transforms_m.RandScaleIntensityD(keys='image', factors=1.5),
+        train = transforms.Compose([
+            Resize(self.config.get('target_size', [512, 512]), antialias=True),
+            transforms.RandomRotation(degrees=10),
+            # transforms.RandomGrayscale(p=1),
+            transforms.RandomAdjustSharpness(1.5),
+            transforms.RandomVerticalFlip(p=0.25,),
+            transforms.RandomHorizontalFlip(p=0.25,)
         ])
         val = transforms.Compose([
-            transforms_m.ResizeD(keys=['image'], spatial_size=self.config.get('target_size', [512, 512])),
-            transforms_m.LambdaD(keys='image', func=lambda x: transforms.Grayscale()(x)),
+            Resize(self.config.get('target_size', [512, 512]), antialias=True),
+            # transforms_m.LambdaD(keys='image', func=lambda x: transforms.Grayscale()(x)),
         ])
         return train, val
 
@@ -447,15 +449,19 @@ class Trainer:
             """
             log(f"Generating onnx model for visualization and to verify model sanity...\n")
             # Fake data
-            data_in = {}
             data = torch.randn(1, *self.data_shape, device=torch.device(self.device))
-            data_in['image'] = data
             if self.dataset_type == SEGMENTATION:
+                data_in = {}
+                data_in['image'] = data
                 data_in['mask'] = data
+            else:
+                data_in = data
             dummy_input = self.train_transforms(data_in)
+            if self.dataset_type == SEGMENTATION:
+                dummy_input = dummy_input['image']
             # Get results
             file = f"{self.output_dir}/model_topology.onnx"
-            torch.onnx.export(model, torch.Tensor(dummy_input['image']), file, verbose=False)
+            torch.onnx.export(model, torch.Tensor(dummy_input), file, verbose=False)
             log(f"Saved onnx model to {file}. Architecture works!")
             log(f"Go to https://netron.app/ to view the architecture.")
             log(self.seperator)
