@@ -159,7 +159,7 @@ class CTNormalizer(Normalizer):
         :param point:
         :return: Normalized data and other two points
         """
-        return Normalize(mean=self.mean, std=self.std)(data.float()), label, point
+        return Normalize(mean=self.mean, std=self.std)(data.float().permute(0, 3, 1, 2)), label, point
 
 
 def get_normalizer(norm: str) -> Type[Normalizer]:

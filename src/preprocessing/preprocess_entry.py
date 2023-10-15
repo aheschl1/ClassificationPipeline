@@ -194,17 +194,18 @@ class Preprocessor:
                          val_normalize_loader, desc=f"Preprocessing {_set} set"):
 
                 point = points[0]
+                writer = point.reader_writer
                 data = data[0].float()  # Take 0 cause batched
                 dest_root = f"{PREPROCESSED_ROOT}/{self.dataset_name}/fold_{fold}/{_set}"
                 if self.dataset_type == SEGMENTATION:
                     dest_root += '/imagesTr'
-                point.reader_writer.write(
+                writer.write(
                     data,
                     f"{dest_root}/{point.case_name}."
                     f"{point.extension if point.extension == 'nii.gz' else 'npy'}"
                 )
                 if self.dataset_type == SEGMENTATION:
-                    point.mask_reader_writer.write(
+                    writer.write(
                         label[0],
                         f"{dest_root.replace('imagesTr', 'labelsTr')}/{point.case_name}."
                         f"{point.extension if point.extension == 'nii.gz' else 'npy'}"

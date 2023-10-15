@@ -79,9 +79,6 @@ def my_import(class_name: str, dropout_package: str = 'torch.nn'):
     elif class_name == "ReverseLinearBottleneck":
         from src.json_models.src.modules import ReverseLinearBottleneck
         return ReverseLinearBottleneck
-    elif class_name == "DecoderBlock":
-        from src.json_models.src.modules import DecoderBlock
-        return DecoderBlock
     else:
         try:
             module = importlib.import_module(dropout_package)

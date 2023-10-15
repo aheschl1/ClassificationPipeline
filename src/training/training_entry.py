@@ -8,11 +8,12 @@ import logging
 import os.path
 import time
 from typing import Tuple, Any
-from torch.optim.lr_scheduler import ExponentialLR, StepLR
+from torch.optim.lr_scheduler import ExponentialLR
 import click
 import multiprocessing_logging  # for multiprocess logging https://github.com/jruere/multiprocessing-logging
 import torch
 import torch.nn as nn
+from torch.optim import SGD, Adam
 from torch.optim import SGD, Adam
 from torch.utils.data import DataLoader
 
@@ -357,18 +358,22 @@ class Trainer:
             scheduler.step()
             with torch.no_grad():
                 mean_val_loss, val_accuracy = self._eval_single_epoch()
+                mean_val_loss, val_accuracy = self._eval_single_epoch()
             if self.save_latest:
                 self.save_model_weights('latest')  # saving model every epoch
             if self.device == 0:
+                self.log_helper.epoch_end(mean_train_loss, mean_val_loss, val_accuracy)
                 self.log_helper.epoch_end(mean_train_loss, mean_val_loss, val_accuracy)
                 log("Learning rate: ", scheduler.optimizer.param_groups[0]['lr'])
                 log(f"Train loss: {mean_train_loss} --change-- {mean_train_loss - last_train_loss}")
                 log(f"Val loss: {mean_val_loss} --change-- {mean_val_loss - last_val_loss}")
                 log(f"Val accuracy: {val_accuracy} --change-- {val_accuracy - last_val_accuracy}")
+                log(f"Val accuracy: {val_accuracy} --change-- {val_accuracy - last_val_accuracy}")
                 self.log_helper.save_figs()
             # update 'last' values
             last_train_loss = mean_train_loss
             last_val_loss = mean_val_loss
+            last_val_accuracy = val_accuracy
             last_val_accuracy = val_accuracy
             # If best model, save!
             if mean_val_loss < best_val_loss:
@@ -437,7 +442,9 @@ class Trainer:
             """
             log(f"Generating onnx model for visualization and to verify model sanity...\n")
             dummy_input = self.train_transforms(torch.randn(1, *self.data_shape, device=torch.device(self.device)))
+            dummy_input = self.train_transforms(torch.randn(1, *self.data_shape, device=torch.device(self.device)))
             file = f"{self.output_dir}/model_topology.onnx"
+            torch.onnx.export(model, dummy_input, file, verbose=False)
             torch.onnx.export(model, dummy_input, file, verbose=False)
             log(f"Saved onnx model to {file}. Architecture works!")
             log(f"Go to https://netron.app/ to view the architecture.")
@@ -490,6 +497,7 @@ class Trainer:
         Property which is the data shape we are training on.
         :return: Shape of data.
         """
+        return self.train_dataloader.dataset.datapoints[0].get_data().shape
         return self.train_dataloader.dataset.datapoints[0].get_data().shape
 
 
