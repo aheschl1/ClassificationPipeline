@@ -81,25 +81,15 @@ def get_raw_datapoints(dataset_name: str, label_to_id_mapping: Dict[str, int] = 
     :param label_to_id_mapping: The label to id mapping for converting label name to number.
     :return: List of datapoints in the dataset.
     """
-    dataset_type = get_dataset_type(dataset_name)
-    if dataset_type == CLASSIFICATION:
-        assert label_to_id_mapping is not None, ("Since this is a classification dataset, expected label_to_id_mapping"
-                                                 " not to be None.")
-    else:
-        assert label_to_id_mapping is None, ("Since this is a segmentation dataset, expected label_to_id_mapping "
-                                             "to be None.")
+    assert label_to_id_mapping is not None, ("Since this is a classification dataset, expected label_to_id_mapping"
+                                             " not to be None.")
 
     dataset_root = f"{RAW_ROOT}/{dataset_name}"
     datapoints = []
-    if dataset_type == CLASSIFICATION:
-        sample_paths = glob.glob(f"{dataset_root}/*/**")
-    else:
-        # Look only at images for segmentation
-        sample_paths = glob.glob(f"{dataset_root}/imagesTr/*")
-
+    sample_paths = glob.glob(f"{dataset_root}/*/**")
     for path in sample_paths:
         # -12 is the label for segmentation to ensure intentionality when building points
-        label = label_to_id_mapping[path.split('/')[-2]] if dataset_type == CLASSIFICATION else -12
+        label = label_to_id_mapping[path.split('/')[-2]]
         case_name = path.split('/')[-1].split('.')[0]
         verify_case_name(case_name)
         datapoints.append(Datapoint(path, label, case_name=case_name, dataset_name=dataset_name))
@@ -117,21 +107,16 @@ def get_preprocessed_datapoints(dataset_name: str, fold: int) \
     """
     train_root = f"{PREPROCESSED_ROOT}/{dataset_name}/fold_{fold}/train"
     val_root = f"{PREPROCESSED_ROOT}/{dataset_name}/fold_{fold}/val"
-    dataset_type = get_dataset_type(dataset_name)
-    if dataset_type == CLASSIFICATION:
-        val_paths = glob.glob(f"{val_root}/*")
-        train_paths = glob.glob(f"{train_root}/*")
-    else:
-        val_paths = glob.glob(f"{val_root}/imagesTr/*")
-        train_paths = glob.glob(f"{train_root}/imagesTr/*")
+    val_paths = glob.glob(f"{val_root}/*")
+    train_paths = glob.glob(f"{train_root}/*")
 
     sample_paths = val_paths + train_paths
     train_datapoints, val_datapoints = [], []
-    label_case_mapping = get_label_case_mapping_from_dataset(dataset_name) if dataset_type == CLASSIFICATION else None
+    label_case_mapping = get_label_case_mapping_from_dataset(dataset_name)
     for path in sample_paths:
         name = path.split('/')[-1].split('.')[0]
         # -12 is sentinel value for segmentation labels to ensure intention.
-        label = -12 if dataset_type == SEGMENTATION else label_case_mapping[name]
+        label = label_case_mapping[name]
         verify_case_name(name)
         if path in val_paths:
             val_datapoints.append(Datapoint(path, label, case_name=name, dataset_name=dataset_name))
@@ -148,10 +133,7 @@ def get_raw_datapoints_folded(dataset_name: str, fold: int) -> Tuple[List[Datapo
     :return: Train and val points.
     """
     fold = get_folds_from_dataset(dataset_name)[str(fold)]
-    if get_dataset_type(dataset_name) == CLASSIFICATION:
-        datapoints = get_raw_datapoints(dataset_name, get_label_mapping_from_dataset(dataset_name))
-    else:
-        datapoints = get_raw_datapoints(dataset_name)
+    datapoints = get_raw_datapoints(dataset_name, get_label_mapping_from_dataset(dataset_name))
     train_points, val_points = [], []
     # Now we populate the train and val lists
     for point in datapoints:
@@ -330,21 +312,3 @@ def get_weights_from_dataset(dataset: PipelineDataset) -> List[float]:
     total = sum(weights)
     weights = [1. - (weight / total) + 1 for weight in weights]
     return weights
-
-
-def get_dataset_type(dataset_name: str) -> Union[SEGMENTATION, CLASSIFICATION]:
-    """
-    Returns the type of dataset.
-    If the two folders under the raw root are exactly imagesTr and labelsTr, it is segmentation.
-    :param dataset_name: The dataset to check
-    :return: segmentation or classification
-    """
-    raw_root = f"{RAW_ROOT}/{dataset_name}"
-    folders = [folder.split('/')[-1] for folder in glob.glob(f"{raw_root}/*")]
-    if len(folders) == 2 and "imagesTr" in folders and "labelsTr" in folders:
-        return SEGMENTATION
-    return CLASSIFICATION
-
-
-if __name__ == "__main__":
-    print(get_dataset_type("Dataset_001"))
