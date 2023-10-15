@@ -28,6 +28,7 @@ class ModelGenerator:
         else:
             self.log_kwargs = None
         if 'Only' in model_definition.keys():
+            # This is to be used if you just want to point to a pre-writen network
             model = my_import(model_definition['Only']['ComponentClass'])
             args = model_definition['Only']['args']
             self.model = model(**args)
