@@ -1,0 +1,8 @@
+{
+    "Only":{
+        "ComponentClass": "enb4_only",
+        "args": {
+            "weights": "EfficientNet_B4_Weights.IMAGENET1K_V1"
+        }
+    }
+}

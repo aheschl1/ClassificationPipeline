@@ -4,12 +4,8 @@ import sys
 sys.path.append("/home/andrew.heschl/Documents/ClassificationPipeline")
 sys.path.append("/home/student/andrew/Documents/ClassificationPipeline")
 sys.path.append("/home/andrewheschl/PycharmProjects/classification_pipeline")
-from src.utils.utils import (write_json,
-                             get_dataset_name_from_id,
-                             check_raw_exists,
-                             get_raw_datapoints,
-                             get_dataloaders_from_fold,
-                             get_dataset_type)
+from src.utils.utils import write_json, get_dataset_name_from_id, check_raw_exists, get_raw_datapoints, \
+    get_dataloaders_from_fold
 from src.preprocessing.utils import maybe_make_preprocessed, get_labels_from_raw
 from src.utils.constants import *
 from src.preprocessing.splitting import Splitter
@@ -33,7 +29,6 @@ class Preprocessor:
         This is the main driver for preprocessing.
         """
         self.dataset_name = get_dataset_name_from_id(dataset_id)
-        self.dataset_type = get_dataset_type(self.dataset_name)
         self.processes = processes
         self.normalize = normalize
         self.labels = None
@@ -45,35 +40,19 @@ class Preprocessor:
         # We export the config building to a new method
         self.build_config()
 
-    def _process_segmentation(self) -> None:
-        ...
-
-    def _process_classification(self) -> None:
-        ...
-
     def process(self) -> None:
-        """
-        Here we will find what labels are present in the dataset.
-        We will also map them to int labels, and save the mappings.
-        We will also get the fold map, and call process_fold on each.
-        :return:
-        """
-        if self.dataset_type == CLASSIFICATION:
-            # Do label mapping. Ex: cat: 0
-            self.labels = get_labels_from_raw(self.dataset_name)
-            assert len(self.labels) > 1, "We only found one label folder, maybe the folder structure is wrong."
-            label_to_id_mapping, id_to_label_mapping = self.map_labels_to_id(return_inverse=True)
-            write_json(label_to_id_mapping, f"{PREPROCESSED_ROOT}/{self.dataset_name}/label_to_id.json")
-            write_json(id_to_label_mapping, f"{PREPROCESSED_ROOT}/{self.dataset_name}/id_to_label.json")
-            self.datapoints = get_raw_datapoints(self.dataset_name, label_to_id_mapping=label_to_id_mapping)
-        else:
-            self.datapoints = get_raw_datapoints(self.dataset_name)
-
+        # Here we will find what labels are present in the dataset. We will also map them to int labels, and save the
+        # mappings.
+        self.labels = get_labels_from_raw(self.dataset_name)
+        assert len(self.labels) > 1, "We only found one label folder, maybe the folder structure is wrong."
+        label_to_id_mapping, id_to_label_mapping = self.map_labels_to_id(return_inverse=True)
+        write_json(label_to_id_mapping, f"{PREPROCESSED_ROOT}/{self.dataset_name}/label_to_id.json")
+        write_json(id_to_label_mapping, f"{PREPROCESSED_ROOT}/{self.dataset_name}/id_to_label.json")
+        self.datapoints = get_raw_datapoints(self.dataset_name, label_to_id_mapping)
         self.verify_dataset_integrity()
         # Label stuff done, start with fetching data. We will also save a case to label mapping.
-        if self.dataset_type == CLASSIFICATION:
-            case_to_label_mapping = self.get_case_to_label_mapping()
-            write_json(case_to_label_mapping, f"{PREPROCESSED_ROOT}/{self.dataset_name}/case_label_mapping.json")
+        case_to_label_mapping = self.get_case_to_label_mapping()
+        write_json(case_to_label_mapping, f"{PREPROCESSED_ROOT}/{self.dataset_name}/case_label_mapping.json")
         splits_map = self.get_folds(self.folds)
         write_json(splits_map, f"{PREPROCESSED_ROOT}/{self.dataset_name}/folds.json")
         # We now have the folds: time to preprocess the data
@@ -104,14 +83,17 @@ class Preprocessor:
         Ensures that all datapoints have the same shape.
         :return:
         """
+        shape = None
         names = set()
         for point in tqdm(self.datapoints, desc="Verifying dataset integrity"):
             names_before = len(names)
             names.add(point.case_name)
             assert names_before < len(names), f"The name {point.case_name} is in the dataset at least 2 times :("
-            if self.dataset_type == SEGMENTATION:
-                image, mask = point.get_data()
-                assert image.shape == mask.shape, f"Mask and image shapes differ on case {point.case_name}."
+            point = point.get_data()
+            if shape is None:
+                shape = point.shape
+            assert point.shape == shape, 'Looks like you have some datapoints with different shapes. ' \
+                                         'Fix that first before coming here.'
 
     def get_folds(self, k: int) -> Dict[int, Dict[str, list]]:
         """
@@ -158,8 +140,7 @@ class Preprocessor:
         """
         print(f"Now starting with fold {fold}...")
         time.sleep(1)
-        train_loader, val_loader = get_dataloaders_from_fold(self.dataset_name,
-                                                             fold,
+        train_loader, val_loader = get_dataloaders_from_fold(self.dataset_name, fold,
                                                              preprocessed_data=False,
                                                              batch_size=1,
                                                              shuffle=False,
@@ -170,12 +151,6 @@ class Preprocessor:
         os.mkdir(f"{PREPROCESSED_ROOT}/{self.dataset_name}/fold_{fold}")
         os.mkdir(f"{PREPROCESSED_ROOT}/{self.dataset_name}/fold_{fold}/train")
         os.mkdir(f"{PREPROCESSED_ROOT}/{self.dataset_name}/fold_{fold}/val")
-        if self.dataset_type == SEGMENTATION:
-            # create the sub folder for seg
-            os.mkdir(f"{PREPROCESSED_ROOT}/{self.dataset_name}/fold_{fold}/train/imagesTr")
-            os.mkdir(f"{PREPROCESSED_ROOT}/{self.dataset_name}/fold_{fold}/val/imagesTr")
-            os.mkdir(f"{PREPROCESSED_ROOT}/{self.dataset_name}/fold_{fold}/train/labelsTr")
-            os.mkdir(f"{PREPROCESSED_ROOT}/{self.dataset_name}/fold_{fold}/val/labelsTr")
         # start saving preprocessed stuff
         train_normalize_loader = train_loader.dataset[0][1].normalizer(train_loader, active=self.normalize)
         val_normalize_loader = val_loader.dataset[0][1] \
@@ -189,27 +164,17 @@ class Preprocessor:
             write_json(mean_json, f"{PREPROCESSED_ROOT}/{self.dataset_name}/fold_{fold}/mean_std.json")
 
         for _set in ['train', 'val']:
-            for data, label, points in \
+            for data, labels, points in \
                     tqdm(train_normalize_loader if _set == 'train' else
                          val_normalize_loader, desc=f"Preprocessing {_set} set"):
-
                 point = points[0]
                 writer = point.reader_writer
                 data = data[0].float()  # Take 0 cause batched
-                dest_root = f"{PREPROCESSED_ROOT}/{self.dataset_name}/fold_{fold}/{_set}"
-                if self.dataset_type == SEGMENTATION:
-                    dest_root += '/imagesTr'
                 writer.write(
                     data,
-                    f"{dest_root}/{point.case_name}."
+                    f"{PREPROCESSED_ROOT}/{self.dataset_name}/fold_{fold}/{_set}/{point.case_name}."
                     f"{point.extension if point.extension == 'nii.gz' else 'npy'}"
                 )
-                if self.dataset_type == SEGMENTATION:
-                    writer.write(
-                        label[0],
-                        f"{dest_root.replace('imagesTr', 'labelsTr')}/{point.case_name}."
-                        f"{point.extension if point.extension == 'nii.gz' else 'npy'}"
-                    )
 
 
 def get_preprocessor_from_name(name: str) -> Type[Preprocessor]:

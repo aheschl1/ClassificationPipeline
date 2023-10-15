@@ -32,9 +32,7 @@ class Datapoint:
         # reader
         if writer is not None:
             self.reader_writer = get_reader_writer(writer)
-            self.reader_writer = get_reader_writer(writer)
         else:
-            self.reader_writer = get_reader_writer_from_extension(self.extension)
             self.reader_writer = get_reader_writer_from_extension(self.extension)
         # normalizer
         if normalizer is not None:

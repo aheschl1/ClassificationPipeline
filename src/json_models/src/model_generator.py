@@ -4,7 +4,7 @@ from typing import Union
 from torch import nn
 
 from src.json_models.src.model_builder import ModelBuilder
-
+from src.json_models.src.utils import my_import
 
 class ModelGenerator:
     def __init__(self, json_path: str) -> None:
@@ -27,7 +27,11 @@ class ModelGenerator:
             self.log_kwargs = model_definition.pop('LogKwargs')
         else:
             self.log_kwargs = None
-
+        if 'Only' in model_definition.keys():
+            model = my_import(model_definition['Only']['ComponentClass'])
+            args = model_definition['Only']['args']
+            self.model = model(**args)
+            return
         if "Encoder" in model_definition.keys():
             ModelGenerator.verify_unet_structure(model_definition)
             model_definition = ModelGenerator._convert_unetlike_to_normal(model_definition)
