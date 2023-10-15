@@ -53,18 +53,29 @@ class PipelineDataset(Dataset):
         point = self.datapoints[idx]
         data = point.get_data(store_metadata=self.store_metadata, )
         mask = None
+        transform_package = {}
         if self.dataset_type == SEGMENTATION:
             mask = data[1]
             data = data[0]
+        # tensor
         if not isinstance(data, torch.Tensor):
             data = torch.from_numpy(data)
         if mask is not None and not isinstance(mask, torch.Tensor):
             mask = torch.from_numpy(mask)
-
+        # transforms
+        transform_package['image'] = data
         if self.transforms is not None:
-            assert self.dataset_type == CLASSIFICATION, "Transformations have not yet been implemented for segmentation."
-            data = self.transforms(data)
+            if self.dataset_type == SEGMENTATION:
+                transform_package['image'] = transform_package['image'].unsqueeze(0)
+                transform_package['mask'] = mask.unsqueeze(0)
+            transform_out = self.transforms(transform_package)
+            data = transform_out['image']
+            if self.dataset_type == SEGMENTATION:
+                mask = transform_out['mask'].squeeze(0)
+                data = data.squeeze(0)
         point.set_num_classes(self.num_classes)
+        # one hot target mask
+
         # bundle properly for segmentation
         if self.dataset_type == SEGMENTATION:
             data = (data, mask)

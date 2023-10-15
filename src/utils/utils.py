@@ -4,7 +4,7 @@ import os
 from typing import Dict, List, Union, Tuple
 import numpy as np
 import torch
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Dataset
 from src.dataloading.datapoint import Datapoint
 from src.dataloading.dataset import PipelineDataset
 from src.utils.constants import PREPROCESSED_ROOT, RAW_ROOT, CLASSIFICATION, SEGMENTATION
@@ -242,7 +242,7 @@ def make_validation_bar_plot(results: Dict[int, int], output_path: str):
     Generates and saves plot of accuracy per class for validation
     """
     quantities, labels = [], []
-    for label, quantity in results.items():
+    for label, quantity in sorted(results.items()):
         quantities.append(quantity)
         labels.append(label)
     x_axis = np.arange(len(labels))
@@ -323,15 +323,6 @@ def get_case_name_from_number(c: int) -> str:
     c = str(c)
     zeros = '0' * (5 - len(c))
     return f"case_{zeros}{c}"
-
-
-def get_weights_from_dataset(dataset: PipelineDataset) -> List[float]:
-    weights = [0 for _ in range(dataset.num_classes)]
-    for point in dataset.datapoints:
-        weights[point.label] += 1
-    total = sum(weights)
-    weights = [1. - (weight / total) + 1 for weight in weights]
-    return weights
 
 
 def get_dataset_type(dataset_name: str) -> Union[SEGMENTATION, CLASSIFICATION]:

@@ -8,17 +8,23 @@ import logging
 import os.path
 import time
 from typing import Tuple, Any
-from torch.optim.lr_scheduler import ExponentialLR
+from torch.optim.lr_scheduler import ExponentialLR, StepLR
 import click
 import multiprocessing_logging  # for multiprocess logging https://github.com/jruere/multiprocessing-logging
 import torch
 import torch.nn as nn
-from torch.optim import SGD, Adam
+from torch.optim import Adam
 from torch.utils.data import DataLoader
 
 from src.utils.constants import *
-from src.utils.utils import get_dataset_name_from_id, read_json, get_dataloaders_from_fold, get_config_from_dataset, \
-    write_json, make_validation_bar_plot, get_weights_from_dataset, get_preprocessed_datapoints
+from src.utils.utils import (get_dataset_name_from_id,
+                             read_json,
+                             get_dataloaders_from_fold,
+                             get_config_from_dataset,
+                             write_json,
+                             make_validation_bar_plot,
+                             get_preprocessed_datapoints,
+                             get_dataset_type)
 from src.json_models.src.model_generator import ModelGenerator
 from src.json_models.src.modules import ModuleStateController
 import torch.multiprocessing as mp
@@ -32,6 +38,9 @@ from torchvision.transforms import Resize
 from torchvision import transforms
 import sys
 import pdb
+import monai.transforms as transforms_m
+from monai.losses import DiceCELoss
+from src.training.metrics import Accuracy, Dice
 
 
 class ForkedPdb(pdb.Pdb):
@@ -133,19 +142,21 @@ class Trainer:
         assert torch.cuda.is_available(), "This pipeline only supports GPU training. No GPU was detected, womp womp."
         self.preload = preload
         self.dataset_name = dataset_name
+        self.dataset_type = get_dataset_type(dataset_name)
         self.fold = fold
         self.world_size = world_size
         self.save_latest = save_latest
         self.device = gpu_id
+        self.seperator = "======================================================================="
         self.output_dir = self._prepare_output_directory(unique_folder_name)
         self.log_helper = LogHelper(self.output_dir)
         self._assert_preprocess_ready_for_train()
         self.config = get_config_from_dataset(dataset_name, config_name)
         if gpu_id == 0:
             log("Config:", self.config)
-        self.id_to_label = read_json(f"{PREPROCESSED_ROOT}/{dataset_name}/id_to_label.json")
-        self.label_to_id = read_json(f"{PREPROCESSED_ROOT}/{dataset_name}/label_to_id.json")
-        self.seperator = "======================================================================="
+        if self.dataset_type == CLASSIFICATION:
+            self.id_to_label = read_json(f"{PREPROCESSED_ROOT}/{dataset_name}/id_to_label.json")
+            self.label_to_id = read_json(f"{PREPROCESSED_ROOT}/{dataset_name}/label_to_id.json")
         # Start on important stuff here
         self.train_dataloader, self.val_dataloader = self._get_dataloaders()
         self.model = self._get_model(model_path)
@@ -158,6 +169,7 @@ class Trainer:
         log(f"Trainer finished initialized on rank {gpu_id}.")
         if self.world_size > 1:
             dist.barrier()
+        self.metric = Accuracy() if self.dataset_type == CLASSIFICATION else Dice()
 
     def _assert_preprocess_ready_for_train(self) -> None:
         """
@@ -224,19 +236,9 @@ class Trainer:
         :return: Train and val dataloaders.
         """
         # Uncomment this if you want to figure out the mean and std of the train set
+        # Reshaping may be necessary
         # mean, std = self._get_mean_std()
-        train_transforms = transforms.Compose([
-            Resize(self.config.get('target_size', [512, 512]), antialias=True),
-            transforms.RandomRotation(degrees=10),
-            transforms.RandomGrayscale(p=1),
-            transforms.RandomAdjustSharpness(1.5),
-            transforms.RandomVerticalFlip(p=0.25,),
-            transforms.RandomHorizontalFlip(p=0.25,),
-        ])
-        val_transforms = transforms.Compose([
-            Resize(self.config.get('target_size', [512, 512]), antialias=True),
-            transforms.RandomGrayscale(p=1)
-        ])
+        train_transforms, val_transforms = self.get_augmentations()
         self.train_transforms = train_transforms
         return get_dataloaders_from_fold(
             self.dataset_name,
@@ -248,6 +250,34 @@ class Trainer:
             rank=self.device,
             world_size=self.world_size
         )
+
+    def get_augmentations(self):
+        if self.dataset_type == CLASSIFICATION:
+            return self._get_classification_augmentations()
+        else:
+            return self._get_segmentation_augmentations()
+
+    def _get_classification_augmentations(self):
+        train = transforms_m.Compose([
+            transforms_m.ResizeD(keys=['image'], spatial_size=self.config.get('target_size', [512, 512])),
+            transforms_m.LambdaD(keys='image', func=lambda x: transforms.Grayscale()(x)),
+            transforms_m.RandRotateD(keys=['image'], range_x=10),
+            transforms_m.RandScaleIntensityD(keys='image', factors=1.5),
+        ])
+        val = transforms.Compose([
+            transforms_m.ResizeD(keys=['image'], spatial_size=self.config.get('target_size', [512, 512])),
+            transforms_m.LambdaD(keys='image', func=lambda x: transforms.Grayscale()(x)),
+        ])
+        return train, val
+
+    def _get_segmentation_augmentations(self):
+        train = transforms_m.Compose([
+            transforms_m.RandSpatialCropD(keys=['image', 'mask'], roi_size=self.config.get('target_size', [512, 512]), random_size=False),
+        ])
+        val = transforms_m.Compose([
+            transforms_m.RandSpatialCropD(keys=['image', 'mask'], roi_size=self.config.get('target_size', [512, 512]), random_size=False),
+        ])
+        return train, val
 
     def _train_single_epoch(self) -> float:
         """
@@ -280,50 +310,28 @@ class Trainer:
         Runs evaluation for a single epoch.
         :return: The mean loss and mean accuracy respectively.
         """
-
-        # noinspection PyUnresolvedReferences
-        def count_correct(preds: torch.Tensor, labels: torch.Tensor) -> int:
-            """
-            Given two tensors, counts the agreement using a one-hot encoding.
-            :param preds:
-            :param labels: The second tensor
-            :return: Count of agreement at dim 1
-            """
-            assert preds.shape == labels.shape, (f"Tensor a and b are different shapes. "
-                                                 f"Got {preds.shape} and {labels.shape}")
-            assert len(preds.shape) == 2, f"Why is the prediction or gt shape of {pred.shape}"
-            results = torch.argmax(preds, dim=1) == torch.argmax(labels, dim=1)
-            for label, pred in zip(torch.argmax(labels, dim=1), torch.argmax(preds, dim=1)):
-                label = label.cpu().item()
-                pred = pred.cpu().item()
-                if label not in results_per_label:
-                    results_per_label[label] = 0
-                    total_per_label[label] = 0
-                results_per_label[label] += (1 if label == pred else 0)
-                total_per_label[label] += 1
-            # case_distribution_fold
-            return results.sum().item()
-
-        results_per_label = {}
-        total_per_label = {}
         running_loss = 0.
-        correct_count = 0.
         total_items = 0
         for data, labels, _ in self.val_dataloader:
             data = data.to(self.device)
+            total_items += data.shape[0]
             labels = labels.to(self.device, non_blocking=True)
-            batch_size = data.shape[0]
             # do prediction and calculate loss
             predictions = self.model(data)
             loss = self.loss(predictions, labels)
             running_loss += loss.item()
-            correct_count += count_correct(predictions, labels)
-            total_items += batch_size
-        write_json(results_per_label, f"{self.output_dir}/accuracy_per_class.json")
-        for label in results_per_label:
-            results_per_label[label] /= total_per_label[label]
-        make_validation_bar_plot(results_per_label, f"{self.output_dir}/accuracy_per_class.png")
-        return running_loss / total_items, correct_count / total_items
+            self.metric.step(predictions, labels)
+
+        metric, *other_data = self.metric.finish()
+        # save the computed accuracy data if applicable
+        if isinstance(self.metric, Accuracy):
+            results_per_label, total_per_label = other_data
+            write_json(results_per_label, f"{self.output_dir}/accuracy_per_class.json")
+            for label in results_per_label:
+                results_per_label[label] /= total_per_label[label]
+            if self.dataset_type == CLASSIFICATION:
+                make_validation_bar_plot(results_per_label, f"{self.output_dir}/accuracy_per_class.png")
+        return running_loss / total_items, metric
 
     # noinspection PyUnresolvedReferences
     def train(self) -> None:
@@ -337,8 +345,8 @@ class Trainer:
         # last values to show change
         last_train_loss = 0
         last_val_loss = 0
-        last_val_accuracy = 0
-        scheduler = ExponentialLR(self.optim, gamma=0.9)
+        last_val_metric = 0
+        scheduler = StepLR(self.optim, step_size=epochs // 10, gamma=0.9)
         for epoch in range(epochs):
             # epoch timing
             # ForkedPdb().set_trace()
@@ -356,20 +364,22 @@ class Trainer:
             self.model.eval()
             scheduler.step()
             with torch.no_grad():
-                mean_val_loss, val_accuracy = self._eval_single_epoch()
+                mean_val_loss, val_metric = self._eval_single_epoch()
             if self.save_latest:
                 self.save_model_weights('latest')  # saving model every epoch
             if self.device == 0:
-                self.log_helper.epoch_end(mean_train_loss, mean_val_loss, val_accuracy)
+                if not isinstance(val_metric, float):
+                    val_metric = val_metric.cpu().item()
+                self.log_helper.epoch_end(mean_train_loss, mean_val_loss, val_metric)
                 log("Learning rate: ", scheduler.optimizer.param_groups[0]['lr'])
                 log(f"Train loss: {mean_train_loss} --change-- {mean_train_loss - last_train_loss}")
                 log(f"Val loss: {mean_val_loss} --change-- {mean_val_loss - last_val_loss}")
-                log(f"Val accuracy: {val_accuracy} --change-- {val_accuracy - last_val_accuracy}")
+                log(f"Val metric: {val_metric} --change-- {val_metric - last_val_metric}")
                 self.log_helper.save_figs()
             # update 'last' values
             last_train_loss = mean_train_loss
             last_val_loss = mean_val_loss
-            last_val_accuracy = val_accuracy
+            last_val_metric = val_metric
             # If best model, save!
             if mean_val_loss < best_val_loss:
                 if self.device == 0:
@@ -436,9 +446,16 @@ class Trainer:
             :return: None
             """
             log(f"Generating onnx model for visualization and to verify model sanity...\n")
-            dummy_input = self.train_transforms(torch.randn(1, *self.data_shape, device=torch.device(self.device)))
+            # Fake data
+            data_in = {}
+            data = torch.randn(1, *self.data_shape, device=torch.device(self.device))
+            data_in['image'] = data
+            if self.dataset_type == SEGMENTATION:
+                data_in['mask'] = data
+            dummy_input = self.train_transforms(data_in)
+            # Get results
             file = f"{self.output_dir}/model_topology.onnx"
-            torch.onnx.export(model, dummy_input, file, verbose=False)
+            torch.onnx.export(model, torch.Tensor(dummy_input['image']), file, verbose=False)
             log(f"Saved onnx model to {file}. Architecture works!")
             log(f"Go to https://netron.app/ to view the architecture.")
             log(self.seperator)
@@ -480,11 +497,21 @@ class Trainer:
         Build the criterion object.
         :return: The loss function to be used.
         """
+        loss_string = None
+        loss = None
+        if self.dataset_type == CLASSIFICATION:
+            loss = nn.CrossEntropyLoss()
+            loss_string = "nn.CrossEntropyLoss()"
+        if self.dataset_type == SEGMENTATION:
+            loss_string = "monai.DiceCELoss()"
+            loss = DiceCELoss(
+                to_onehot_y=True,
+                softmax=True
+            )
+
         if self.device == 0:
-            log("Loss being used is nn.CrossEntropyLoss()")
-        weights = get_weights_from_dataset(self.train_dataloader.dataset)
-        print(f"Loss using weights: {weights}")
-        return nn.CrossEntropyLoss(weight=torch.Tensor(weights).to(self.device))
+            log(f"Loss being used is {loss_string}")
+        return loss
 
     @property
     def data_shape(self) -> Tuple[int, int, int]:
@@ -492,7 +519,9 @@ class Trainer:
         Property which is the data shape we are training on.
         :return: Shape of data.
         """
-        return self.train_dataloader.dataset.datapoints[0].get_data().shape
+        if self.dataset_type == CLASSIFICATION:
+            return self.train_dataloader.dataset.datapoints[0].get_data().shape
+        return self.train_dataloader.dataset.datapoints[0].get_data()[0].shape
 
 
 def log(*messages):

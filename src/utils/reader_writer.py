@@ -41,7 +41,7 @@ class SimpleITKReaderWriter(BaseReaderWriter):
                                               "dataset name."
         expected_folder = f"{PREPROCESSED_ROOT}/{self.dataset_name}/metadata"
         expected_file = f"{expected_folder}/{self.case_name}.pkl"
-        # Assumption being made here is that images and masks will have the same metadata within a case.
+        # TODO Assumption being made here is that images and masks will have the same metadata within a case.
         data = {
             'spacing': self.spacing,
             'direction': self.direction,

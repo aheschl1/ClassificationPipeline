@@ -40,15 +40,16 @@ class Datapoint:
         self.num_classes = None
         # reader
         if writer is not None:
-            self.reader_writer = get_reader_writer(writer)
+            self.reader_writer_class = get_reader_writer(writer)
         else:
-            self.reader_writer = get_reader_writer_from_extension(self.extension)
+            self.reader_writer_class = get_reader_writer_from_extension(self.extension)
         # normalizer
         if normalizer is not None:
             self.normalizer = get_normalizer(writer)
         else:
             self.normalizer = get_normalizer_from_extension(self.extension)
-        self.reader_writer = self.reader_writer(case_name=case_name, dataset_name=dataset_name)
+        self.reader_writer = self.reader_writer_class(case_name=case_name, dataset_name=dataset_name)
+        self.mask_reader_writer = self.reader_writer_class(case_name=f"mask_{case_name}", dataset_name=dataset_name)
         # seg
         if self.dataset_type == SEGMENTATION:
             self.mask_path = self.image_path.replace('imagesTr', "labelsTr")
@@ -67,7 +68,7 @@ class Datapoint:
             image = self.reader_writer.read(self.image_path, **kwargs)
             if self.dataset_type == CLASSIFICATION:
                 return image
-            mask = self.reader_writer.read(self.mask_path, **kwargs)
+            mask = self.mask_reader_writer.read(self.mask_path, **kwargs)
             return image, mask
         # Caching must be on. Crash for now.
         raise NotImplementedError("Currently, caching is not supported. It is unstable and leaks.")

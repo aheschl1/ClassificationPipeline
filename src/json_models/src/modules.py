@@ -4,6 +4,8 @@ from src.json_models.src.model_builder import ModelBuilder
 import torch.nn as nn
 import torch
 
+from src.json_models.src.utils import my_import
+
 CONCAT = 'concat'
 ADD = 'add'
 TWO_D = '2d'
@@ -753,7 +755,7 @@ class Linker(nn.Module):
 
         if self.mode == ADD:
             return self.module(x + extra)
-        return self.module(torch.concat((x, extra)))
+        return self.module(torch.concat((x, extra), dim=1))
 
 
 class InstanceNorm(nn.Module):
@@ -811,3 +813,67 @@ class AveragePool(nn.Module):
 
     def forward(self, x):
         return self.pool(x)
+
+
+class DecoderBlock(nn.Module):
+    def __init__(self,
+                 in_channels,
+                 out_channels,
+                 conv_op: str,
+                 kernel_size=3,
+                 dilation=1,
+                 last_layer: bool = False,
+                 pad="default",
+                 transpose_kernel=2,
+                 transpose_stride=2,
+                 dropout_p: float = 0.
+                 ) -> None:
+        super().__init__()
+
+        conv_op = my_import(conv_op)
+        transp_op = ModuleStateController.transp_op()
+        norm_op = ModuleStateController.batch_norm_op()
+
+        pad = (kernel_size - 1) // 2 * dilation if pad == 'default' else int(pad)
+        self.conv1 = nn.Sequential(
+            conv_op(
+                in_channels=in_channels * 2,
+                out_channels=in_channels,
+                kernel_size=kernel_size,
+                dilation=dilation,
+                padding=pad
+            ),
+            norm_op(num_features=in_channels),
+            nn.LeakyReLU(inplace=True)
+        )
+        self.conv2 = nn.Sequential(
+            conv_op(
+                in_channels=in_channels,
+                out_channels=(out_channels if last_layer else in_channels),
+                kernel_size=kernel_size,
+                dilation=dilation,
+                padding=pad
+            )
+        )
+        if not last_layer:
+            self.transpose = transp_op(
+                in_channels=in_channels,
+                out_channels=out_channels,
+                stride=transpose_stride,
+                kernel_size=transpose_kernel
+            )
+            self.conv2.append(
+                norm_op(num_features=in_channels)
+            )
+            self.conv2.append(
+                nn.LeakyReLU(inplace=True)
+            )
+
+        self.last_layer = last_layer
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.conv2(x)
+        if not self.last_layer:
+            return self.transpose(x)
+        return x
