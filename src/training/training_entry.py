@@ -268,7 +268,7 @@ class Trainer:
             loss.backward()
             self.optim.step()
             # gather data
-            running_loss += loss.item()
+            running_loss += loss.item()*batch_size
             total_items += batch_size
 
         return running_loss / total_items
@@ -314,7 +314,7 @@ class Trainer:
             # do prediction and calculate loss
             predictions = self.model(data)
             loss = self.loss(predictions, labels)
-            running_loss += loss.item()
+            running_loss += loss.item()*batch_size
             correct_count += count_correct(predictions, labels)
             total_items += batch_size
         write_json(results_per_label, f"{self.output_dir}/accuracy_per_class.json")
