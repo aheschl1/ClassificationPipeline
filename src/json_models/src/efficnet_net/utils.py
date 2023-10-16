@@ -78,17 +78,21 @@ class SwishImplementation(torch.autograd.Function):
 class NonLinearity(nn.Module):
     def __init__(self):
         super().__init__()
-        self.coefficiants = nn.ParameterList()
-        self.powers = nn.ParameterList()
-        for i in range(1, 11):
-            self.coefficiants.append(nn.Parameter(torch.Tensor([i])))
-        for i in range(1, 11):
-            self.powers.append(nn.Parameter(torch.Tensor([1/i])))
+        self.coefficiants = nn.ParameterList([
+            0, 1, 0, 0, 0, 0, 0, 0, 0, 0
+        ])
+        self.powers = nn.ParameterList([
+            0, 1, 2, 3, 4, 5, 6, 7, 8, 9
+        ])
+        # for i in range(1, 11):
+        #     self.coefficiants.append(nn.Parameter(torch.Tensor([i])))
+        # for i in range(1, 11):
+        #     self.powers.append(nn.Parameter(torch.Tensor([1/i])))
 
     def forward(self, x):
         result = torch.zeros_like(x)
         for co, pow in zip(self.coefficiants, self.powers):
-            result = torch.add(result, co*torch.pow(x, pow))
+            result = torch.add(result, torch.mul(co, torch.pow(x, pow)))
         return result
 
 
