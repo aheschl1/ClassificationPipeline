@@ -1,4 +1,5 @@
 import glob
+import itertools
 import sys
 
 # Adds the source to path for imports and stuff
@@ -8,19 +9,19 @@ sys.path.append("/home/student/andrew/Documents/ClassificationPipeline")
 import logging
 import os.path
 import time
-from typing import Tuple, Any
-from torch.optim.lr_scheduler import ExponentialLR, StepLR
+from typing import Tuple, Any, Dict
+from torch.optim.lr_scheduler import StepLR
 import click
 import multiprocessing_logging  # for multiprocess logging https://github.com/jruere/multiprocessing-logging
 import torch
 import torch.nn as nn
-from torch.optim import SGD, Adam
+from torch.optim import SGD
 from torch.utils.data import DataLoader
 import shutil
-
+from sklearn.metrics import confusion_matrix
 from src.utils.constants import *
 from src.utils.utils import get_dataset_name_from_id, read_json, get_dataloaders_from_fold, get_config_from_dataset, \
-    write_json, make_validation_bar_plot, get_weights_from_dataset, get_preprocessed_datapoints
+    get_preprocessed_datapoints
 from src.json_models.src.model_generator import ModelGenerator
 from src.json_models.src.modules import ModuleStateController
 import torch.multiprocessing as mp
@@ -28,13 +29,15 @@ from torch.utils.data.distributed import DistributedSampler
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.distributed import init_process_group, destroy_process_group
 import torch.distributed as dist
-import matplotlib.pyplot as plt
 import datetime
 from torchvision.transforms import Resize
 from torchvision import transforms
 import sys
 import pdb
-import tensorboard as tf
+from torch.utils.tensorboard import SummaryWriter
+import matplotlib.pyplot as plt
+import numpy as np
+
 
 class ForkedPdb(pdb.Pdb):
     """
@@ -52,63 +55,77 @@ class ForkedPdb(pdb.Pdb):
 
 
 class LogHelper:
-    def __init__(self, output_dir: str) -> None:
+    def __init__(self, output_dir: str, class_names: Dict[int, str]) -> None:
         """
         This class is for the storage and graphing of loss/accuracy data throughout training.
         :param output_dir: Folder on device where graphs should be output.
         """
         assert os.path.exists(output_dir), f"Output directory {output_dir} doesn't exist."
         self.output_dir = output_dir
+        self.class_names = [class_names[i] for i in sorted(class_names)]
         self.losses_train, self.losses_val, self.accuracies_val = [], [], []
+        self.summary_writer = SummaryWriter(log_dir=f"{self.output_dir}/tensorboard")
+        self.epoch = 0
 
-    def epoch_end(self, train_loss: float, val_loss: float, val_accuracy: float) -> None:
+    def epoch_end(self, train_loss: float, val_loss: float, val_accuracy: float, learning_rate: float) -> None:
         """
         Called at the end of an epoch and updates the lists of data.
+        :param learning_rate: Current learning rate
         :param train_loss: The train loss of the epoch
         :param val_loss: The validation loss from the epoch
         :param val_accuracy: The validation accuracy from the epoch
         :return: Nothing
         """
-        self.losses_train.append(train_loss)
-        self.losses_val.append(val_loss)
-        self.accuracies_val.append(val_accuracy)
+        self.summary_writer.add_scalar("Loss/train", train_loss, self.epoch)
+        self.summary_writer.add_scalar("Loss/val", val_loss, self.epoch)
+        self.summary_writer.add_scalar("Metrics/val_accuracy", val_accuracy, self.epoch)
+        self.summary_writer.add_scalar("Metrics/learning_rate", learning_rate, self.epoch)
+        self.epoch += 1
 
-    def save_figs(self) -> None:
+    def eval_epoch_complete(self, predictions: torch.Tensor, labels: torch.Tensor):
+        cm = confusion_matrix(labels.detach().cpu(), predictions.detach().cpu())
+        fig = self._plot_confusion_matrix(cm)
+        self.summary_writer.add_figure("Metrics/confusion", fig, self.epoch)
+
+    def log_image(self, image: Any):
+        self.summary_writer.add_image('augmented_images', image)
+
+    def log_net_structure(self, net, images):
+        self.summary_writer.add_graph(net, images)
+
+    def _plot_confusion_matrix(self, matrix):
         """
-        Saves four graphs to file. Val/Train loss, val accuracy, and each loss separate.
-        :return: Nothing
+        Returns a matplotlib figure containing the plotted confusion matrix.
+        Args:
+           matrix (array, shape = [n, n]): a confusion matrix of integer classes
         """
-        num_epochs = len(self.accuracies_val)
-        # accuracy
-        plt.plot([i for i in range(num_epochs)], self.accuracies_val)
-        plt.title('Validation Accuracy VS Epoch')
-        plt.xlabel("Epoch")
-        plt.ylabel("Accuracy")
-        plt.savefig(f"{self.output_dir}/graph_accuracies.png")
-        plt.close()
-        # train loss
-        plt.plot([i for i in range(num_epochs)], self.losses_train)
-        plt.title('Train Loss VS Epoch')
-        plt.xlabel("Epoch")
-        plt.ylabel("Train Loss")
-        plt.savefig(f"{self.output_dir}/graph_train_loss.png")
-        plt.close()
-        # val loss
-        plt.plot([i for i in range(num_epochs)], self.losses_val)
-        plt.title('Validation Loss VS Epoch')
-        plt.xlabel("Epoch")
-        plt.ylabel("Validation Loss")
-        plt.savefig(f"{self.output_dir}/graph_val_loss.png")
-        plt.close()
-        # both losses
-        plt.plot([i for i in range(num_epochs)], self.losses_val, label="Val Loss")
-        plt.plot([i for i in range(num_epochs)], self.losses_train, label="Train Loss")
-        plt.title('Losses VS Epoch')
-        plt.xlabel("Epoch")
-        plt.ylabel("Loss")
-        plt.legend()
-        plt.savefig(f"{self.output_dir}/graph_both_loss.png")
-        plt.close()
+
+        figure = plt.figure(figsize=(8, 8))
+        plt.imshow(matrix, interpolation='nearest', cmap='blues')
+        plt.title("Confusion matrix")
+        plt.colorbar()
+        tick_marks = np.arange(len(self.class_names))
+        plt.xticks(tick_marks, self.class_names, rotation=45)
+        plt.yticks(tick_marks, self.class_names)
+
+        # Normalize the confusion matrix.
+        cm = np.around(matrix.astype('float') / matrix.sum(axis=1)[:, np.newaxis], decimals=2)
+
+        # Use white text if squares are dark; otherwise black.
+        threshold = cm.max() / 2.
+
+        for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
+            color = "white" if cm[i, j] > threshold else "black"
+            plt.text(j, i, cm[i, j], horizontalalignment="center", color=color)
+
+        plt.tight_layout()
+        plt.ylabel('True label')
+        plt.xlabel('Predicted label')
+        return plt.figure()
+
+    def __del__(self):
+        self.summary_writer.flush()
+        self.summary_writer.close()
 
 
 class Trainer:
@@ -140,7 +157,8 @@ class Trainer:
         self.save_latest = save_latest
         self.device = gpu_id
         self.output_dir = self._prepare_output_directory(unique_folder_name)
-        self.log_helper = LogHelper(self.output_dir)
+        class_names = read_json(f"{PREPROCESSED_ROOT}/{self.dataset_name}/id_to_label.json")
+        self.log_helper = LogHelper(self.output_dir, class_names)
         self._assert_preprocess_ready_for_train()
         self.config = get_config_from_dataset(dataset_name, config_name)
         if gpu_id == 0:
@@ -193,7 +211,7 @@ class Trainer:
         This method stub should be used if you want to normalize outside of preprocessing.
 
         You can use:
-        src.utils.utils.get_preprocessed_datapoints(self.dataset_name, self.fold) -> [train datapoints, val datapoints]
+        src.utils.utils.get_preprocessed_datapoints(dataset_name, fold) -> [train datapoints, val datapoints]
 
         Also check src.utils.normalizer, that may help you!
         It is written to just calculate train and val sets mean and std.
@@ -249,7 +267,7 @@ class Trainer:
             world_size=self.world_size
         )
 
-    def _train_single_epoch(self) -> float:
+    def _train_single_epoch(self, log_image: bool = False) -> float:
         """
         The training of each epoch is done here.
         :return: The mean loss of the epoch.
@@ -259,6 +277,8 @@ class Trainer:
         # ForkedPdb().set_trace()
         for data, labels, _ in self.train_dataloader:
             self.optim.zero_grad()
+            if log_image:
+                self.log_helper.log_image(data[0])
             data = data.to(self.device)
             labels = labels.to(self.device, non_blocking=True)
             batch_size = data.shape[0]
@@ -275,37 +295,13 @@ class Trainer:
 
         return running_loss / total_items
 
+    # noinspection PyTypeChecker
     def _eval_single_epoch(self) -> Tuple[float, float]:
         """
         Runs evaluation for a single epoch.
         :return: The mean loss and mean accuracy respectively.
         """
 
-        # noinspection PyUnresolvedReferences
-        def count_correct(preds: torch.Tensor, labels: torch.Tensor) -> int:
-            """
-            Given two tensors, counts the agreement using a one-hot encoding.
-            :param preds:
-            :param labels: The second tensor
-            :return: Count of agreement at dim 1
-            """
-            assert preds.shape == labels.shape, (f"Tensor a and b are different shapes. "
-                                                 f"Got {preds.shape} and {labels.shape}")
-            assert len(preds.shape) == 2, f"Why is the prediction or gt shape of {pred.shape}"
-            results = torch.argmax(preds, dim=1) == torch.argmax(labels, dim=1)
-            for label, pred in zip(torch.argmax(labels, dim=1), torch.argmax(preds, dim=1)):
-                label = label.cpu().item()
-                pred = pred.cpu().item()
-                if label not in results_per_label:
-                    results_per_label[label] = 0
-                    total_per_label[label] = 0
-                results_per_label[label] += (1 if label == pred else 0)
-                total_per_label[label] += 1
-            # case_distribution_fold
-            return results.sum().item()
-
-        results_per_label = {}
-        total_per_label = {}
         running_loss = 0.
         correct_count = 0.
         total_items = 0
@@ -317,12 +313,13 @@ class Trainer:
             predictions = self.model(data)
             loss = self.loss(predictions, labels)
             running_loss += loss.item() * batch_size
-            correct_count += count_correct(predictions, labels)
+            # analyze
+            predictions = torch.argmax(predictions, dim=1)
+            labels = torch.argmax(predictions, dim=1)
+            self.log_helper.eval_epoch_complete(predictions, labels)
+            correct_count += torch.sum(predictions == labels)
             total_items += batch_size
-        write_json(results_per_label, f"{self.output_dir}/accuracy_per_class.json")
-        for label in results_per_label:
-            results_per_label[label] /= total_per_label[label]
-        make_validation_bar_plot(results_per_label, f"{self.output_dir}/accuracy_per_class.png")
+
         return running_loss / total_items, correct_count / total_items
 
     # noinspection PyUnresolvedReferences
@@ -352,7 +349,7 @@ class Trainer:
                 if epoch == 0 and self.world_size > 1:
                     log("First epoch will be slow due to loading workers.")
             self.model.train()
-            mean_train_loss = self._train_single_epoch()
+            mean_train_loss = self._train_single_epoch(log_image=(epoch % 10 == 0))
             self.model.eval()
             scheduler.step()
             with torch.no_grad():
@@ -360,12 +357,13 @@ class Trainer:
             if self.save_latest:
                 self.save_model_weights('latest')  # saving model every epoch
             if self.device == 0:
-                self.log_helper.epoch_end(mean_train_loss, mean_val_loss, val_accuracy)
+                self.log_helper.epoch_end(
+                    mean_train_loss, mean_val_loss, val_accuracy, scheduler.optimizer.param_groups[0]['lr']
+                )
                 log("Learning rate: ", scheduler.optimizer.param_groups[0]['lr'])
                 log(f"Train loss: {mean_train_loss} --change-- {mean_train_loss - last_train_loss}")
                 log(f"Val loss: {mean_val_loss} --change-- {mean_val_loss - last_val_loss}")
                 log(f"Val accuracy: {val_accuracy} --change-- {val_accuracy - last_val_accuracy}")
-                self.log_helper.save_figs()
             # update 'last' values
             last_train_loss = mean_train_loss
             last_val_loss = mean_val_loss
@@ -430,26 +428,15 @@ class Trainer:
         :return: The pytorch network module.
         """
 
-        def onnx_export() -> None:
-            """
-            Generates an onnx file with network topology data for visualization.
-            :return: None
-            """
-            log(f"Generating onnx model for visualization and to verify model sanity...\n")
-            dummy_input = self.train_transforms(torch.randn(1, *self.data_shape, device=torch.device(self.device)))
-            file = f"{self.output_dir}/model_topology.onnx"
-            torch.onnx.export(model, dummy_input, file, verbose=False)
-            log(f"Saved onnx model to {file}. Architecture works!")
-            log(f"Go to https://netron.app/ to view the architecture.")
-            log(self.seperator)
-
         gen = ModelGenerator(json_path=path)
         model = gen.get_model().to(self.device)
         if self.device == 0:
             log('Model log args: ')
             log(gen.get_log_kwargs())
         if self.device == 0:
-            onnx_export()
+            self.log_helper.log_net_structure(model, self.train_transforms(
+                torch.randn(1, *self.data_shape, device=torch.device(self.device))
+            ))
         return model
 
     def _load_checkpoint(self, weights_name) -> None:
