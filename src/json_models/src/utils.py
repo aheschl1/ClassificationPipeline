@@ -11,9 +11,9 @@ def my_import(class_name: str, dropout_package: str = 'torch.nn'):
     :return: Any object defined in this long if/else sequence.
     """
     # check premades
-    if class_name == 'efficientnet-b4':
-        from src.json_models.src.efficnet_net.efficient_net import EfficientNet
-        return EfficientNet.from_name("efficientnet-b4")
+    if class_name == 'mobilenetv2':
+        from src.json_models.src.mobile_net.mobilenetv2 import MobileNetV2
+        return MobileNetV2
     # Here checks backbones
     if class_name == ENB6:
         return models.efficientnet_b6

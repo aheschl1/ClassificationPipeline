@@ -437,7 +437,7 @@ class XModule(nn.Module):
                  apply_norm: bool = False, gated=False, norm_op: str = 'batch', **kwargs):
         super(XModule, self).__init__()
         if kernel_sizes is None:
-            kernel_sizes = [3]
+            kernel_sizes = [kwargs['kernel_size']]
         if dilations is None:
             dilations = [1]
         self.branches = nn.ModuleList()
@@ -811,3 +811,36 @@ class AveragePool(nn.Module):
 
     def forward(self, x):
         return self.pool(x)
+
+
+class PolyWrapper(nn.Module):
+  def __init__(self, in_channels, out_channels, order, stride: int = 1, conv_op = Conv):
+    super().__init__()
+    self.branches = nn.ModuleList([
+        PolyBlock(in_channels, out_channels, o, stride, conv_op=conv_op) for o in range(1, order+1)
+    ])
+  def forward(self, x):
+    out = None
+    mean = torch.mean(x)
+    x = torch.sub(x, mean)
+    for mod in self.branches:
+      if out is None:
+        out = mod(x)
+      else:
+        out = torch.add(out, mod(x))
+    return out
+
+class PolyBlock(nn.Module):
+  def __init__(self, in_channels: int, out_channels: int, order: int, stride: int = 1, conv_op = Conv):
+    super().__init__()
+    self.order = order
+    self.conv = conv_op(in_channels, out_channels, kernel_size=3, stride=stride)
+    self.ch_maxpool = nn.MaxPool3d((in_channels, 1, 1), stride=(in_channels, 1, 1))
+  def forward(self, x):
+    std = torch.std(x)
+    x = torch.clip(x, -3*std, 3*std)
+    x_pow = torch.pow(x, self.order)
+    norm = self.ch_maxpool(torch.abs(x_pow))
+    x_normed = x_pow/(norm + 1e-7)
+    out = self.conv(x_normed)
+    return out
