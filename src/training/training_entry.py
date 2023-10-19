@@ -1,3 +1,4 @@
+import glob
 import sys
 
 # Adds the source to path for imports and stuff
@@ -15,6 +16,7 @@ import torch
 import torch.nn as nn
 from torch.optim import SGD, Adam
 from torch.utils.data import DataLoader
+import shutil
 
 from src.utils.constants import *
 from src.utils.utils import get_dataset_name_from_id, read_json, get_dataloaders_from_fold, get_config_from_dataset, \
@@ -32,7 +34,7 @@ from torchvision.transforms import Resize
 from torchvision import transforms
 import sys
 import pdb
-
+import tensorboard as tf
 
 class ForkedPdb(pdb.Pdb):
     """
@@ -229,8 +231,8 @@ class Trainer:
             Resize(self.config.get('target_size', [512, 512]), antialias=True),
             transforms.RandomRotation(degrees=10),
             transforms.RandomAdjustSharpness(1.5),
-            transforms.RandomVerticalFlip(p=0.25,),
-            transforms.RandomHorizontalFlip(p=0.25,),
+            transforms.RandomVerticalFlip(p=0.25, ),
+            transforms.RandomHorizontalFlip(p=0.25, ),
         ])
         val_transforms = transforms.Compose([
             Resize(self.config.get('target_size', [512, 512]), antialias=True),
@@ -268,7 +270,7 @@ class Trainer:
             loss.backward()
             self.optim.step()
             # gather data
-            running_loss += loss.item()*batch_size
+            running_loss += loss.item() * batch_size
             total_items += batch_size
 
         return running_loss / total_items
@@ -314,7 +316,7 @@ class Trainer:
             # do prediction and calculate loss
             predictions = self.model(data)
             loss = self.loss(predictions, labels)
-            running_loss += loss.item()*batch_size
+            running_loss += loss.item() * batch_size
             correct_count += count_correct(predictions, labels)
             total_items += batch_size
         write_json(results_per_label, f"{self.output_dir}/accuracy_per_class.json")
@@ -533,9 +535,17 @@ def ddp_training(rank, world_size: int, dataset_id: int,
     """
     setup_ddp(rank, world_size)
     dataset_name = get_dataset_name_from_id(dataset_id)
-    trainer = Trainer(dataset_name, fold, save_latest, model, rank, session_id, config,
-                      checkpoint_name=load_weights, preload=preload, world_size=world_size)
-    trainer.train()
+    trainer = None
+    try:
+        trainer = Trainer(dataset_name, fold, save_latest, model, rank, session_id, config,
+                          checkpoint_name=load_weights, preload=preload, world_size=world_size)
+        trainer.train()
+    except Exception as e:
+        if trainer is not None and trainer.output_dir is not None:
+            out_files = glob.glob(f"{trainer.output_dir}/*")
+            if len(out_files) < 3:
+                shutil.rmtree(trainer.output_dir)
+        raise e
     destroy_process_group()
 
 
@@ -590,11 +600,19 @@ def main(fold: int,
         )
     elif gpus == 1:
         dataset_name = get_dataset_name_from_id(dataset_id)
-        trainer = Trainer(dataset_name, fold, save_latest, model, 0, session_id, config,
-                          checkpoint_name=load_weights, preload=preload, world_size=1)
-        trainer.train()
+        trainer = None
+        try:
+            trainer = Trainer(dataset_name, fold, save_latest, model, 0, session_id, config,
+                              checkpoint_name=load_weights, preload=preload, world_size=1)
+            trainer.train()
+        except Exception as e:
+            if trainer is not None and trainer.output_dir is not None:
+                out_files = glob.glob(f"{trainer.output_dir}/*")
+                if len(out_files) < 3:
+                    shutil.rmtree(trainer.output_dir)
+            raise e
     else:
-        raise NotImplementedError('You ust set gpus to >= 1')
+        raise NotImplementedError('You must set gpus to >= 1')
 
 
 if __name__ == "__main__":

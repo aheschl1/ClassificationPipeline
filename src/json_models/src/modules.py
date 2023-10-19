@@ -841,6 +841,6 @@ class PolyBlock(nn.Module):
     x = torch.clip(x, -3*std, 3*std)
     x_pow = torch.pow(x, self.order)
     norm = self.ch_maxpool(torch.abs(x_pow))
-    x_normed = x_pow/(norm + 1e-7)
+    x_normed = torch.div(x_pow, norm + 1e-7)
     out = self.conv(x_normed)
     return out

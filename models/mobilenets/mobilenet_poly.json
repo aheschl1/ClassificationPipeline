@@ -1,9 +1,9 @@
 {
     "LogKwargs": {
         "backbone": "Mobilenetv2",
-        "conv": "reg",
-        "poly": "false",
-        "order": "NA"
+        "conv": "conv",
+        "poly": true,
+        "order": "3"
     },
     "Tag": "mobilenet-v2",
     "Children": [
