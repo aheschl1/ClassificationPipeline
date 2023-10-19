@@ -100,7 +100,6 @@ class LogHelper:
            matrix (array, shape = [n, n]): a confusion matrix of integer classes
         """
 
-        figure = plt.figure(figsize=(8, 8))
         plt.imshow(matrix, interpolation='nearest', cmap='blues')
         plt.title("Confusion matrix")
         plt.colorbar()
