@@ -8,12 +8,8 @@
     "Children": [
         {
             "ComponentClass": "mobilenetv2",
-            "args": {}
-        },
-        {
-            "ComponentClass": "Flatten",
             "args": {
-                "dim":1
+                "poly": true
             }
         },
         {

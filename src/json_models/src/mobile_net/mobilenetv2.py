@@ -1,5 +1,4 @@
 import torch.nn as nn
-from torchsummary import summary
 from src.json_models.src.modules import PolyWrapper
 
 def dwise_conv(ch_in, stride=1):
@@ -98,7 +97,7 @@ class MobileNetV2(nn.Module):
         self.last_conv = conv1x1(input_channel, 1280)
 
         self.classifier = nn.Sequential(
-            nn.Dropout2d(0.2),
+            nn.Dropout(0.2),
             nn.Linear(1280, 1000)
         )
         self.avg_pool = nn.AdaptiveAvgPool2d(1)
@@ -115,4 +114,3 @@ class MobileNetV2(nn.Module):
 if __name__=="__main__":
     # model check
     model = MobileNetV2(ch_in=3, n_classes=1000)
-    summary(model, (3, 224, 224), device='cpu')
