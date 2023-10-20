@@ -86,11 +86,13 @@ class LogHelper:
         self.summary_writer.add_scalar("Metrics/learning_rate", learning_rate, self.epoch)
         self.summary_writer.add_scalar("Peformance/epoch_duration", duration, self.epoch)
         self.epoch += 1
+        self.summary_writer.flush()
 
     def eval_epoch_complete(self, predictions: torch.Tensor, labels: torch.Tensor):
         cm = confusion_matrix(labels.detach().cpu(), predictions.detach().cpu(), normalize='true', labels=[i for i in range(len(self.class_names))])
         fig = sn.heatmap(cm, annot=True, fmt='.2%', cmap='Blues', xticklabels=self.class_names, yticklabels=self.class_names).get_figure()
         self.summary_writer.add_figure("Metrics/confusion", fig, self.epoch)
+        self.summary_writer.flush()
 
     def log_image(self, image: Any):
         self.summary_writer.add_image('Augmented Images', image, self.image_step)

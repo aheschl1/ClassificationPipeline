@@ -54,6 +54,7 @@ class InvertedBlock(nn.Module):
             layers.extend([
                 PolyWrapper(hidden_dim, ch_out, 3, stride=stride),
                 nn.BatchNorm2d(ch_out),
+                nn.ReLU6()
             ])
 
         self.layers = nn.Sequential(*layers)
@@ -80,7 +81,11 @@ class MobileNetV2(nn.Module):
         ]
 
         if poly:
-            self.stem_conv = PolyWrapper(ch_in, 32, 3, stride=2)
+            self.stem_conv = nn.Sequential(
+                PolyWrapper(ch_in, 32, 3, stride=2),
+                nn.BatchNorm2d(32),
+                nn.ReLU6()
+            )
         else:
             self.stem_conv = conv3x3(ch_in, 32, stride=2)
 
