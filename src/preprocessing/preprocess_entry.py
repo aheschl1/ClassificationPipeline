@@ -4,6 +4,7 @@ import sys
 sys.path.append("/home/andrew.heschl/Documents/ClassificationPipeline")
 sys.path.append("/home/student/andrew/Documents/ClassificationPipeline")
 sys.path.append("/home/andrewheschl/PycharmProjects/classification_pipeline")
+sys.path.append('/home/tapotosh.ghosh/ClassificationPipeline')
 sys.path.append("/home/student/andrewheschl/Documents/ClassificationPipeline")
 from src.utils.utils import write_json, get_dataset_name_from_id, check_raw_exists, get_raw_datapoints, \
     get_dataloaders_from_fold
