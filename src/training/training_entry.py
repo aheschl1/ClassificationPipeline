@@ -18,7 +18,7 @@ import torch.nn as nn
 from torch.optim import SGD
 from torch.utils.data import DataLoader
 import shutil
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 from src.utils.constants import *
 from src.utils.utils import get_dataset_name_from_id, read_json, get_dataloaders_from_fold, get_config_from_dataset, \
     get_preprocessed_datapoints
@@ -36,8 +36,8 @@ import sys
 import pdb
 from torch.utils.tensorboard import SummaryWriter
 import matplotlib.pyplot as plt
+import seaborn as sn
 import numpy as np
-
 
 class ForkedPdb(pdb.Pdb):
     """
@@ -55,7 +55,7 @@ class ForkedPdb(pdb.Pdb):
 
 
 class LogHelper:
-    def __init__(self, output_dir: str, class_names: Dict[int, str]) -> None:
+    def __init__(self, output_dir: str, class_names: Dict[int, str], max_images: int = 10) -> None:
         """
         This class is for the storage and graphing of loss/accuracy data throughout training.
         :param output_dir: Folder on device where graphs should be output.
@@ -66,8 +66,10 @@ class LogHelper:
         self.losses_train, self.losses_val, self.accuracies_val = [], [], []
         self.summary_writer = SummaryWriter(log_dir=f"{self.output_dir}/tensorboard")
         self.epoch = 0
+        self.image_step = 0
+        self.max_images = max_images
 
-    def epoch_end(self, train_loss: float, val_loss: float, val_accuracy: float, learning_rate: float) -> None:
+    def epoch_end(self, train_loss: float, val_loss: float, val_accuracy: float, learning_rate: float, duration: float) -> None:
         """
         Called at the end of an epoch and updates the lists of data.
         :param learning_rate: Current learning rate
@@ -78,49 +80,29 @@ class LogHelper:
         """
         self.summary_writer.add_scalar("Loss/train", train_loss, self.epoch)
         self.summary_writer.add_scalar("Loss/val", val_loss, self.epoch)
+        self.summary_writer.add_scalars("Loss/both", {'train':train_loss, 'val':val_loss}, self.epoch)
+
         self.summary_writer.add_scalar("Metrics/val_accuracy", val_accuracy, self.epoch)
         self.summary_writer.add_scalar("Metrics/learning_rate", learning_rate, self.epoch)
+        self.summary_writer.add_scalar("Peformance/epoch_duration", duration, self.epoch)
         self.epoch += 1
 
     def eval_epoch_complete(self, predictions: torch.Tensor, labels: torch.Tensor):
-        cm = confusion_matrix(labels.detach().cpu(), predictions.detach().cpu())
-        fig = self._plot_confusion_matrix(cm)
+        cm = confusion_matrix(labels.detach().cpu(), predictions.detach().cpu(), normalize='true', labels=[i for i in range(len(self.class_names))])
+        fig = sn.heatmap(cm, annot=True, fmt='.2%', cmap='Blues', xticklabels=self.class_names, yticklabels=self.class_names).get_figure()
         self.summary_writer.add_figure("Metrics/confusion", fig, self.epoch)
 
     def log_image(self, image: Any):
-        self.summary_writer.add_image('augmented_images', image)
+        self.summary_writer.add_image('Augmented Images', image, self.image_step)
+        self.image_step += 1
+        if self.image_step > self.max_images:
+            self.image_step = 0
 
     def log_net_structure(self, net, images):
         self.summary_writer.add_graph(net, images)
-
-    def _plot_confusion_matrix(self, matrix):
-        """
-        Returns a matplotlib figure containing the plotted confusion matrix.
-        Args:
-           matrix (array, shape = [n, n]): a confusion matrix of integer classes
-        """
-
-        plt.imshow(matrix, interpolation='nearest', cmap='blues')
-        plt.title("Confusion matrix")
-        plt.colorbar()
-        tick_marks = np.arange(len(self.class_names))
-        plt.xticks(tick_marks, self.class_names, rotation=45)
-        plt.yticks(tick_marks, self.class_names)
-
-        # Normalize the confusion matrix.
-        cm = np.around(matrix.astype('float') / matrix.sum(axis=1)[:, np.newaxis], decimals=2)
-
-        # Use white text if squares are dark; otherwise black.
-        threshold = cm.max() / 2.
-
-        for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
-            color = "white" if cm[i, j] > threshold else "black"
-            plt.text(j, i, cm[i, j], horizontalalignment="center", color=color)
-
-        plt.tight_layout()
-        plt.ylabel('True label')
-        plt.xlabel('Predicted label')
-        return plt.figure()
+    
+    def log_parameters(self, total, trainable):
+        self.summary_writer.add_scalars('Network/params', {'total':total, 'trainable':trainable})
 
     def __del__(self):
         self.summary_writer.flush()
@@ -155,6 +137,7 @@ class Trainer:
         self.world_size = world_size
         self.save_latest = save_latest
         self.device = gpu_id
+        self.softmax = nn.Softmax(dim=1)
         self.output_dir = self._prepare_output_directory(unique_folder_name)
         class_names = read_json(f"{PREPROCESSED_ROOT}/{self.dataset_name}/id_to_label.json")
         self.log_helper = LogHelper(self.output_dir, class_names)
@@ -313,8 +296,8 @@ class Trainer:
             loss = self.loss(predictions, labels)
             running_loss += loss.item() * batch_size
             # analyze
-            predictions = torch.argmax(predictions, dim=1)
-            labels = torch.argmax(predictions, dim=1)
+            predictions = torch.argmax(self.softmax(predictions), dim=1)
+            labels = torch.argmax(labels, dim=1)
             self.log_helper.eval_epoch_complete(predictions, labels)
             correct_count += torch.sum(predictions == labels)
             total_items += batch_size
@@ -356,9 +339,6 @@ class Trainer:
             if self.save_latest:
                 self.save_model_weights('latest')  # saving model every epoch
             if self.device == 0:
-                self.log_helper.epoch_end(
-                    mean_train_loss, mean_val_loss, val_accuracy, scheduler.optimizer.param_groups[0]['lr']
-                )
                 log("Learning rate: ", scheduler.optimizer.param_groups[0]['lr'])
                 log(f"Train loss: {mean_train_loss} --change-- {mean_train_loss - last_train_loss}")
                 log(f"Val loss: {mean_val_loss} --change-- {mean_val_loss - last_val_loss}")
@@ -376,6 +356,9 @@ class Trainer:
             epoch_end_time = time.time()
             if self.device == 0:
                 log(f"Process {self.device} took {epoch_end_time - epoch_start_time} seconds.")
+                self.log_helper.epoch_end(
+                    mean_train_loss, mean_val_loss, val_accuracy, scheduler.optimizer.param_groups[0]['lr'], epoch_end_time - epoch_start_time
+                )
 
         # Now training is completed, print some stuff
         if self.world_size > 1:
@@ -432,10 +415,14 @@ class Trainer:
         if self.device == 0:
             log('Model log args: ')
             log(gen.get_log_kwargs())
-        if self.device == 0:
             self.log_helper.log_net_structure(model, self.train_transforms(
                 torch.randn(1, *self.data_shape, device=torch.device(self.device))
             ))
+        all_params = sum(param.numel() for param in model.parameters())
+        trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        log(f"Total paramaters: {all_params}")
+        log(f"Trainable params: {trainable_params}")
+        self.log_helper.log_parameters(all_params, trainable_params)
         return model
 
     def _load_checkpoint(self, weights_name) -> None:
@@ -529,7 +516,7 @@ def ddp_training(rank, world_size: int, dataset_id: int,
     except Exception as e:
         if trainer is not None and trainer.output_dir is not None:
             out_files = glob.glob(f"{trainer.output_dir}/*")
-            if len(out_files) < 3:
+            if len(out_files) < 2:
                 shutil.rmtree(trainer.output_dir)
         raise e
     destroy_process_group()
@@ -594,7 +581,7 @@ def main(fold: int,
         except Exception as e:
             if trainer is not None and trainer.output_dir is not None:
                 out_files = glob.glob(f"{trainer.output_dir}/*")
-                if len(out_files) < 3:
+                if len(out_files) < 2:
                     shutil.rmtree(trainer.output_dir)
             raise e
     else:

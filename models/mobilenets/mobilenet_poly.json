@@ -10,7 +10,7 @@
         {
             "ComponentClass": "mobilenetv2",
             "args": {
-                "poly": false
+                "poly": true
             }
         },
         {
