@@ -844,3 +844,24 @@ class PolyBlock(nn.Module):
     x_normed = torch.div(x_pow, norm + 1e-7)
     out = self.conv(x_normed)
     return out
+
+
+class PolyWrapperFact(nn.Module):
+  def __init__(self, in_channels, out_channels, order, stride: int = 1, conv_op = Conv):
+    super().__init__()
+    self.branches = nn.ModuleList([
+        PolyBlock(in_channels, out_channels, o, stride, conv_op=conv_op) for o in range(1, order+1)
+    ])
+  def forward(self, x):
+    out = None
+    mean = torch.mean(x)
+    x = torch.sub(x, mean)
+    first = self.branches[0](x)
+    
+    for mod in self.branches[1:]:
+      w = torch.mul(first, mod(x))
+      if out is None:
+        out = w
+      else:
+        out = torch.add(out, w)
+    return out if out is not None else first

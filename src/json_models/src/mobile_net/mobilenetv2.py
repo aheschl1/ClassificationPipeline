@@ -1,5 +1,5 @@
 import torch.nn as nn
-from src.json_models.src.modules import PolyWrapper
+from src.json_models.src.modules import PolyWrapper, PolyWrapperFact
 
 def dwise_conv(ch_in, stride=1):
     return (
@@ -30,7 +30,7 @@ def conv3x3(ch_in, ch_out, stride):
     )
 
 class InvertedBlock(nn.Module):
-    def __init__(self, ch_in, ch_out, expand_ratio, stride, poly):
+    def __init__(self, ch_in, ch_out, expand_ratio, stride, poly, poly_op):
         super(InvertedBlock, self).__init__()
 
         self.stride = stride
@@ -52,7 +52,7 @@ class InvertedBlock(nn.Module):
             ])
         else:
             layers.extend([
-                PolyWrapper(hidden_dim, ch_out, 3, stride=stride),
+                poly_op(hidden_dim, ch_out, 3, stride=stride),
                 nn.BatchNorm2d(ch_out),
                 nn.ReLU6()
             ])
@@ -79,10 +79,13 @@ class MobileNetV2(nn.Module):
             [6, 160, 3, 2],
             [6, 320, 1, 1]
         ]
-
+        if 'fact' in poly_kwargs and poly_kwargs['fact']:
+            wrapper = PolyWrapperFact
+        else:
+            wrapper = PolyWrapper
         if poly:
             self.stem_conv = nn.Sequential(
-                PolyWrapper(ch_in, 32, 3, stride=2),
+                wrapper(ch_in, 32, 3, stride=2),
                 nn.BatchNorm2d(32),
                 nn.ReLU6()
             )
@@ -94,7 +97,7 @@ class MobileNetV2(nn.Module):
         for t, c, n, s in self.configs:
             for i in range(n):
                 stride = s if i == 0 else 1
-                layers.append(InvertedBlock(ch_in=input_channel, ch_out=c, expand_ratio=t, stride=stride, poly=poly))
+                layers.append(InvertedBlock(ch_in=input_channel, ch_out=c, expand_ratio=t, stride=stride, poly=poly, poly_op=wrapper))
                 input_channel = c
 
         self.layers = nn.Sequential(*layers)
