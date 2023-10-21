@@ -4,6 +4,8 @@ from src.json_models.src.model_builder import ModelBuilder
 import torch.nn as nn
 import torch
 
+from src.json_models.src.utils import my_import
+
 CONCAT = 'concat'
 ADD = 'add'
 TWO_D = '2d'
@@ -814,54 +816,51 @@ class AveragePool(nn.Module):
 
 
 class PolyWrapper(nn.Module):
-  def __init__(self, in_channels, out_channels, order, stride: int = 1, conv_op = Conv):
-    super().__init__()
-    self.branches = nn.ModuleList([
-        PolyBlock(in_channels, out_channels, o, stride, conv_op=conv_op) for o in range(1, order+1)
-    ])
-  def forward(self, x):
-    out = None
-    mean = torch.mean(x)
-    x = torch.sub(x, mean)
-    for mod in self.branches:
-      if out is None:
-        out = mod(x)
-      else:
-        out = torch.add(out, mod(x))
-    return out
+    def __init__(self, in_channels, out_channels, order, stride: int = 1, conv_op='Conv', mode='sum'):
+        super().__init__()
+        assert mode in ['sum', 'fact']
+        self.fact_mode = mode == 'fact'
+        conv_op = my_import(conv_op)
+        self.branches = nn.ModuleList([
+            PolyBlock(in_channels, out_channels, o, stride, conv_op=conv_op) for o in range(1, order + 1)
+        ])
+
+    def forward(self, x):
+        if self.fact_mode:
+            return self._fact_forward(x)
+        out = None
+        for mod in self.branches:
+            if out is None:
+                out = mod(x)
+            else:
+                out = torch.add(out, mod(x))
+        return out
+
+    def _fact_forward(self, x):
+        out = None
+        first = self.branches[0](x)
+
+        for mod in self.branches[1:]:
+            w = torch.mul(first, mod(x))
+            if out is None:
+                out = w
+            else:
+                out = torch.add(out, w)
+        return out if out is not None else first
+
 
 class PolyBlock(nn.Module):
-  def __init__(self, in_channels: int, out_channels: int, order: int, stride: int = 1, conv_op = Conv):
-    super().__init__()
-    self.order = order
-    self.conv = conv_op(in_channels, out_channels, kernel_size=3, stride=stride)
-    self.ch_maxpool = nn.MaxPool3d((in_channels, 1, 1), stride=(in_channels, 1, 1))
-  def forward(self, x):
-    std = torch.std(x)
-    x = torch.clip(x, -3*std, 3*std)
-    x_pow = torch.pow(x, self.order)
-    norm = self.ch_maxpool(torch.abs(x_pow))
-    x_normed = torch.div(x_pow, norm + 1e-7)
-    out = self.conv(x_normed)
-    return out
+    def __init__(self, in_channels: int, out_channels: int, order: int, stride: int = 1, conv_op=Conv):
+        super().__init__()
+        self.order = order
+        self.conv = conv_op(in_channels, out_channels, kernel_size=3, stride=stride)
+        self.ch_maxpool = nn.MaxPool3d((in_channels, 1, 1), stride=(in_channels, 1, 1))
 
-
-class PolyWrapperFact(nn.Module):
-  def __init__(self, in_channels, out_channels, order, stride: int = 1, conv_op = Conv):
-    super().__init__()
-    self.branches = nn.ModuleList([
-        PolyBlock(in_channels, out_channels, o, stride, conv_op=conv_op) for o in range(1, order+1)
-    ])
-  def forward(self, x):
-    out = None
-    mean = torch.mean(x)
-    x = torch.sub(x, mean)
-    first = self.branches[0](x)
-    
-    for mod in self.branches[1:]:
-      w = torch.mul(first, mod(x))
-      if out is None:
-        out = w
-      else:
-        out = torch.add(out, w)
-    return out if out is not None else first
+    def forward(self, x):
+        std = torch.std(x)
+        x = torch.clip(x, -3 * std, 3 * std)
+        x_pow = torch.pow(x, self.order)
+        norm = self.ch_maxpool(torch.abs(x_pow))
+        x_normed = torch.div(x_pow, norm + 1e-7)
+        out = self.conv(x_normed)
+        return out

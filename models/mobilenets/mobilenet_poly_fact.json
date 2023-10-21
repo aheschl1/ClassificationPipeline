@@ -2,7 +2,6 @@
     "LogKwargs": {
         "backbone": "Mobilenetv2",
         "conv": "conv_fact",
-        "poly": true,
         "order": "3"
     },
     "Tag": "mobilenet-v2",
@@ -10,8 +9,9 @@
         {
             "ComponentClass": "mobilenetv2",
             "args": {
-                "poly": true,
-                "fact": true
+                "conv_op": "Poly",
+                "mode": "fact",
+                "order": 3
             }
         },
         {

@@ -1,15 +1,22 @@
 import torch.nn as nn
-from src.json_models.src.modules import PolyWrapper, PolyWrapperFact
+from src.json_models.src.modules import PolyWrapper, XModule
 
-def dwise_conv(ch_in, stride=1):
-    return (
-        nn.Sequential(
-            #depthwise
-            nn.Conv2d(ch_in, ch_in, kernel_size=3, padding=1, stride=stride, groups=ch_in, bias=False),
-            nn.BatchNorm2d(ch_in),
+
+class DWSeperable(nn.Module):
+    def __init__(self, in_channels, out_channels, stride, **kwargs):
+        super().__init__()
+        self.net = nn.Sequential(
+            # depthwise
+            nn.Conv2d(in_channels, in_channels, kernel_size=3, padding=1, stride=stride, groups=in_channels, bias=False),
+            nn.BatchNorm2d(in_channels),
             nn.ReLU6(inplace=True),
+            # point
+            nn.Conv2d(in_channels, out_channels, kernel_size=1, padding=0, stride=1, bias=False),
         )
-    )
+
+    def forward(self, x):
+        return self.net(x)
+
 
 def conv1x1(ch_in, ch_out):
     return (
@@ -20,6 +27,7 @@ def conv1x1(ch_in, ch_out):
         )
     )
 
+
 def conv3x3(ch_in, ch_out, stride):
     return (
         nn.Sequential(
@@ -29,33 +37,26 @@ def conv3x3(ch_in, ch_out, stride):
         )
     )
 
+
 class InvertedBlock(nn.Module):
-    def __init__(self, ch_in, ch_out, expand_ratio, stride, poly, poly_op):
+    def __init__(self, ch_in, ch_out, expand_ratio, stride, conv_op, **conv_args):
         super(InvertedBlock, self).__init__()
 
         self.stride = stride
-        assert stride in [1,2]
+        assert stride in [1, 2]
 
         hidden_dim = ch_in * expand_ratio
-
-        self.use_res_connect = self.stride==1 and ch_in==ch_out
+        self.use_res_connect = self.stride == 1 and ch_in == ch_out
 
         layers = []
         if expand_ratio != 1:
             layers.append(conv1x1(ch_in, hidden_dim))
-        if not poly:
-            layers.extend([
-                #dw
-                dwise_conv(hidden_dim, stride=stride),
-                #pw
-                conv1x1(hidden_dim, ch_out)
-            ])
-        else:
-            layers.extend([
-                poly_op(hidden_dim, ch_out, 3, stride=stride),
-                nn.BatchNorm2d(ch_out),
-                nn.ReLU6()
-            ])
+
+        layers.extend([
+            conv_op(hidden_dim, ch_out, stride=stride, **conv_args),
+            nn.BatchNorm2d(ch_out),
+            nn.ReLU6()
+        ])
 
         self.layers = nn.Sequential(*layers)
 
@@ -65,11 +66,12 @@ class InvertedBlock(nn.Module):
         else:
             return self.layers(x)
 
-class MobileNetV2(nn.Module):
-    def __init__(self, ch_in=3, poly: bool = False, **poly_kwargs):
-        super(MobileNetV2, self).__init__()
 
-        self.configs=[
+class MobileNetV2(nn.Module):
+    def __init__(self, ch_in=3, conv_op: str = 'DW', **conv_args):
+        super(MobileNetV2, self).__init__()
+        assert conv_op in ['DW', 'Conv', 'Poly', 'PolyFact', 'XModule']
+        self.configs = [
             # t, c, n, s
             [1, 16, 1, 1],
             [6, 24, 2, 2],
@@ -79,25 +81,24 @@ class MobileNetV2(nn.Module):
             [6, 160, 3, 2],
             [6, 320, 1, 1]
         ]
-        if 'fact' in poly_kwargs and poly_kwargs['fact']:
-            wrapper = PolyWrapperFact
-        else:
-            wrapper = PolyWrapper
-        if poly:
-            self.stem_conv = nn.Sequential(
-                wrapper(ch_in, 32, 3, stride=2),
-                nn.BatchNorm2d(32),
-                nn.ReLU6()
-            )
-        else:
-            self.stem_conv = conv3x3(ch_in, 32, stride=2)
+        conv = None
+        if conv_op == 'DW':
+            conv = DWSeperable
+        elif conv_op == 'Conv':
+            conv = nn.Conv2d
+        elif conv_op == 'Poly':
+            conv = PolyWrapper
+        elif conv_op == 'XModule':
+            conv = XModule
+
+        self.stem_conv = conv3x3(ch_in, 32, stride=2)
 
         layers = []
         input_channel = 32
         for t, c, n, s in self.configs:
             for i in range(n):
                 stride = s if i == 0 else 1
-                layers.append(InvertedBlock(ch_in=input_channel, ch_out=c, expand_ratio=t, stride=stride, poly=poly, poly_op=wrapper))
+                layers.append(InvertedBlock(ch_in=input_channel, ch_out=c, expand_ratio=t, stride=stride, conv_op=conv, **conv_args))
                 input_channel = c
 
         self.layers = nn.Sequential(*layers)
@@ -119,6 +120,6 @@ class MobileNetV2(nn.Module):
         return x
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
     # model check
     model = MobileNetV2(ch_in=3, n_classes=1000)
