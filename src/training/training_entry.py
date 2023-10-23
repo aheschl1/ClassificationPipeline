@@ -370,7 +370,6 @@ class Trainer:
         seconds_taken = end_time - start_time
         if self.device == 0:
             log(self.seperator)
-            self.log_helper.save_figs()
             log(f"Finished training {epochs} epochs.")
             log(f"{seconds_taken} seconds")
             log(f"{seconds_taken / 60} minutes")
