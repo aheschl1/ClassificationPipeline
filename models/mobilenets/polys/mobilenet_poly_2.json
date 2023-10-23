@@ -2,17 +2,19 @@
     "LogKwargs": {
         "backbone": "Mobilenetv2",
         "conv": "Poly",
-        "order": "2",
+        "order": "1, 2",
         "mode": "sum"
     },
     "Tag": "mobilenet-v2",
     "Children": [
         {
             "ComponentClass": "mobilenetv2",
-            "args": {
-                "conv_op": "Poly",
-                "mode": "sum",
-                "order": 2
+             "args": {
+                "conv": "Poly",
+                "conv_args": {
+                    "order": [1, 2],
+                    "poly_mode": "sum"
+                }
             }
         },
         {

@@ -71,7 +71,7 @@ class Preprocessor:
             'batch_size': 16,
             'processes': self.processes,
             'lr': 0.01,
-            'epochs': 10,
+            'epochs': 100,
             'momentum': 0.8,
             'weight_decay': 1e-7,
             'target_size': [512, 512]

@@ -1,3 +1,5 @@
+from typing import Dict
+
 import torch.nn as nn
 from src.json_models.src.modules import PolyWrapper, XModule
 
@@ -39,7 +41,7 @@ def conv3x3(ch_in, ch_out, stride):
 
 
 class InvertedBlock(nn.Module):
-    def __init__(self, ch_in, ch_out, expand_ratio, stride, conv_op, **conv_args):
+    def __init__(self, ch_in, ch_out, expand_ratio, stride, conv, conv_args: Dict):
         super(InvertedBlock, self).__init__()
 
         self.stride = stride
@@ -53,7 +55,7 @@ class InvertedBlock(nn.Module):
             layers.append(conv1x1(ch_in, hidden_dim))
 
         layers.extend([
-            conv_op(hidden_dim, ch_out, stride=stride, **conv_args),
+            conv(hidden_dim, ch_out, stride=stride, **conv_args),
             nn.BatchNorm2d(ch_out),
             nn.ReLU6()
         ])
@@ -68,9 +70,9 @@ class InvertedBlock(nn.Module):
 
 
 class MobileNetV2(nn.Module):
-    def __init__(self, ch_in=3, conv_op: str = 'DW', **conv_args):
+    def __init__(self, ch_in=3, conv: str = 'DW', conv_args: Dict = None):
         super(MobileNetV2, self).__init__()
-        assert conv_op in ['DW', 'Conv', 'Poly', 'PolyFact', 'XModule']
+        assert conv in ['DW', 'Conv', 'Poly', 'PolyFact', 'XModule']
         self.configs = [
             # t, c, n, s
             [1, 16, 1, 1],
@@ -81,15 +83,15 @@ class MobileNetV2(nn.Module):
             [6, 160, 3, 2],
             [6, 320, 1, 1]
         ]
-        conv = None
-        if conv_op == 'DW':
-            conv = DWSeperable
-        elif conv_op == 'Conv':
-            conv = nn.Conv2d
-        elif conv_op == 'Poly':
-            conv = PolyWrapper
-        elif conv_op == 'XModule':
-            conv = XModule
+        conv_op = None
+        if conv == 'DW':
+            conv_op = DWSeperable
+        elif conv == 'Conv':
+            conv_op = nn.Conv2d
+        elif conv == 'Poly':
+            conv_op = PolyWrapper
+        elif conv == 'XModule':
+            conv_op = XModule
 
         self.stem_conv = conv3x3(ch_in, 32, stride=2)
 
@@ -98,7 +100,8 @@ class MobileNetV2(nn.Module):
         for t, c, n, s in self.configs:
             for i in range(n):
                 stride = s if i == 0 else 1
-                layers.append(InvertedBlock(ch_in=input_channel, ch_out=c, expand_ratio=t, stride=stride, conv_op=conv, **conv_args))
+                layers.append(InvertedBlock(ch_in=input_channel, ch_out=c, expand_ratio=t, stride=stride, conv=conv_op,
+                                            conv_args=conv_args))
                 input_channel = c
 
         self.layers = nn.Sequential(*layers)

@@ -1,4 +1,6 @@
 import math
+from typing import List, Dict
+
 from einops.layers.torch import Reduce
 from src.json_models.src.model_builder import ModelBuilder
 import torch.nn as nn
@@ -441,7 +443,7 @@ class XModule(nn.Module):
         if kernel_sizes is None:
             kernel_sizes = [kwargs['kernel_size']]
         if dilations is None:
-            dilations = [1]
+            dilations = [1 for i in range(len(kernel_sizes))]
         self.branches = nn.ModuleList()
         self.apply_norm = apply_norm
 
@@ -455,9 +457,6 @@ class XModule(nn.Module):
             self.norm_op = nn.BatchNorm2d if ModuleStateController.state == TWO_D else nn.BatchNorm3d
 
         self.gated = gated
-
-        if 'kernel_size' in kwargs:
-            kernel_sizes = [kwargs['kernel_size']]
 
         assert len(dilations) == len(kernel_sizes)
         assert mode in [CONCAT, ADD], "Valid values for mode are 'concat' and 'add'"
@@ -816,13 +815,17 @@ class AveragePool(nn.Module):
 
 
 class PolyWrapper(nn.Module):
-    def __init__(self, in_channels, out_channels, order, stride: int = 1, conv_op='Conv', mode='sum'):
+    def __init__(self, in_channels, out_channels, order: List[int], stride: int = 1, conv_op='Conv', poly_mode='sum',
+                 conv_args=None):
         super().__init__()
-        assert mode in ['sum', 'fact']
-        self.fact_mode = mode == 'fact'
+        if conv_args is None:
+            conv_args = {}
+        assert len(order) > 0, "Order must be a list of exponents with length > 0."
+        assert poly_mode in ['sum', 'fact']
+        self.fact_mode = poly_mode == 'fact'
         conv_op = my_import(conv_op)
         self.branches = nn.ModuleList([
-            PolyBlock(in_channels, out_channels, o, stride, conv_op=conv_op) for o in range(1, order + 1)
+            PolyBlock(in_channels, out_channels, o, stride, conv_op=conv_op, **conv_args) for o in order
         ])
 
     def forward(self, x):
@@ -850,13 +853,16 @@ class PolyWrapper(nn.Module):
 
 
 class PolyBlock(nn.Module):
-    def __init__(self, in_channels: int, out_channels: int, order: int, stride: int = 1, conv_op=Conv):
+    def __init__(self, in_channels: int, out_channels: int, order: int, stride: int = 1, conv_op=Conv, **conv_args):
         super().__init__()
         self.order = order
-        self.conv = conv_op(in_channels, out_channels, kernel_size=3, stride=stride)
+        self.conv = conv_op(in_channels, out_channels, kernel_size=conv_args.pop('kernel_size', 3), stride=stride,
+                            **conv_args)
         self.ch_maxpool = nn.MaxPool3d((in_channels, 1, 1), stride=(in_channels, 1, 1))
 
     def forward(self, x):
+        if self.order == 1:
+            return self.conv(x)
         std = torch.std(x)
         x = torch.clip(x, -3 * std, 3 * std)
         x_pow = torch.pow(x, self.order)
