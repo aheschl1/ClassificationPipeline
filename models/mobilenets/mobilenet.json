@@ -2,7 +2,8 @@
     "LogKwargs": {
         "backbone": "Mobilenetv2",
         "conv": "DW",
-        "order": "NA"
+        "order": "NA",
+        "mode": "NA"
     },
     "Tag": "mobilenet-v2",
     "Children": [
