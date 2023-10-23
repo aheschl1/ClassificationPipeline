@@ -1,5 +1,4 @@
 import glob
-import itertools
 import sys
 
 # Adds the source to path for imports and stuff
@@ -18,7 +17,7 @@ import torch.nn as nn
 from torch.optim import SGD
 from torch.utils.data import DataLoader
 import shutil
-from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+from sklearn.metrics import confusion_matrix
 from src.utils.constants import *
 from src.utils.utils import get_dataset_name_from_id, read_json, get_dataloaders_from_fold, get_config_from_dataset, \
     get_preprocessed_datapoints
@@ -35,9 +34,8 @@ from torchvision import transforms
 import sys
 import pdb
 from torch.utils.tensorboard import SummaryWriter
-import matplotlib.pyplot as plt
 import seaborn as sn
-import numpy as np
+
 
 class ForkedPdb(pdb.Pdb):
     """
@@ -80,7 +78,7 @@ class LogHelper:
         """
         self.summary_writer.add_scalar("Loss/train", train_loss, self.epoch)
         self.summary_writer.add_scalar("Loss/val", val_loss, self.epoch)
-        self.summary_writer.add_scalars("Loss/both", {'train':train_loss, 'val':val_loss}, self.epoch)
+        self.summary_writer.add_scalars("Loss/both", {'train': train_loss, 'val': val_loss}, self.epoch)
 
         self.summary_writer.add_scalar("Metrics/val_accuracy", val_accuracy, self.epoch)
         self.summary_writer.add_scalar("Metrics/learning_rate", learning_rate, self.epoch)
@@ -89,7 +87,8 @@ class LogHelper:
         self.summary_writer.flush()
 
     def eval_epoch_complete(self, predictions: torch.Tensor, labels: torch.Tensor):
-        cm = confusion_matrix(labels.detach().cpu(), predictions.detach().cpu(), normalize='true', labels=[i for i in range(len(self.class_names))])
+        cm = confusion_matrix(labels.detach().cpu(), predictions.detach().cpu(), normalize='true',
+                              labels=[i for i in range(len(self.class_names))])
         fig = sn.heatmap(cm, annot=True, fmt='.2%', cmap='Blues', xticklabels=self.class_names, yticklabels=self.class_names).get_figure()
         self.summary_writer.add_figure("Metrics/confusion", fig, self.epoch)
         self.summary_writer.flush()
@@ -102,9 +101,9 @@ class LogHelper:
 
     def log_net_structure(self, net, images):
         self.summary_writer.add_graph(net, images)
-    
+
     def log_parameters(self, total, trainable):
-        self.summary_writer.add_scalars('Network/params', {'total':total, 'trainable':trainable})
+        self.summary_writer.add_scalars('Network/params', {'total': total, 'trainable': trainable})
 
     def __del__(self):
         self.summary_writer.flush()
@@ -359,7 +358,8 @@ class Trainer:
             if self.device == 0:
                 log(f"Process {self.device} took {epoch_end_time - epoch_start_time} seconds.")
                 self.log_helper.epoch_end(
-                    mean_train_loss, mean_val_loss, val_accuracy, scheduler.optimizer.param_groups[0]['lr'], epoch_end_time - epoch_start_time
+                    mean_train_loss, mean_val_loss, val_accuracy, scheduler.optimizer.param_groups[0]['lr'],
+                    epoch_end_time - epoch_start_time
                 )
 
         # Now training is completed, print some stuff
