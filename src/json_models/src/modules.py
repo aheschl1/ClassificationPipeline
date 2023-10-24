@@ -458,7 +458,7 @@ class XModule(nn.Module):
 
         self.pw = nn.Sequential(
             nn.ReLU(),
-            nn.BatchNorm2d(num_features=in_channels),
+            nn.BatchNorm2d(num_features=in_channels * len(kernel_sizes)),
             nn.Conv2d(in_channels=in_channels * len(kernel_sizes), out_channels=out_channels, kernel_size=1)
         )
 
