@@ -14,6 +14,10 @@ import pandas as pd
 
 class Analysis:
     def __init__(self, folders, output_root: str):
+        """
+        Given a list of folders (expected to be folders inside of a fold folder in result root),
+        controls the analysis of logs.
+        """
         self.output_root = output_root
         print("Reading logs...")
         self.logs = Analysis._get_logs(folders)
@@ -30,6 +34,10 @@ class Analysis:
 
     @staticmethod
     def _get_logs(folders):
+        """
+        Given a parent folder (fold_x folder), finds all log files recursively.
+        Creates LogAnalyzer for each and saves to property. 
+        """
         logs = []
         for folder in folders:
             time_stamp = folder.split('/')[-1]
@@ -43,6 +51,10 @@ class Analysis:
         return logs
 
     def analyze(self):
+        """
+        Performs analysis on logs which which been processed from constructor.
+        Saves to output folder.
+        """
         frames = [Analysis._analyze_group(group) for group in self.grouped_logs]
         print(f"Saving results to {self.output_root}.")
         for i, frame in enumerate(frames):
