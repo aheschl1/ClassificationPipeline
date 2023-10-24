@@ -437,102 +437,30 @@ class XModule(nn.Module):
     """
     """
 
-    def __init__(self, in_channels, out_channels, dilations=None, kernel_sizes=None, mode='concat', stride=1,
-                 apply_norm: bool = False, gated=False, norm_op: str = 'batch', **kwargs):
+    def __init__(self, in_channels, out_channels, kernel_sizes=None, stride=1, **kwargs):
         super(XModule, self).__init__()
         if kernel_sizes is None:
             kernel_sizes = [kwargs['kernel_size']]
-        if dilations is None:
-            dilations = [1 for i in range(len(kernel_sizes))]
         self.branches = nn.ModuleList()
-        self.apply_norm = apply_norm
-
-        assert norm_op in [INSTANCE, BATCH], "Invalid norm operation. Do better"
-        assert not (ModuleStateController.state == '3d' and gated), "Cannot use gated convolution in 3d XModule."
 
         # Picl the norm op
-        if norm_op == INSTANCE and apply_norm:
-            self.norm_op = nn.InstanceNorm2d if ModuleStateController.state == TWO_D else nn.InstanceNorm3d
-        elif apply_norm:
-            self.norm_op = nn.BatchNorm2d if ModuleStateController.state == TWO_D else nn.BatchNorm3d
+        self.norm_op = nn.BatchNorm2d
 
-        self.gated = gated
+        assert out_channels % len(kernel_sizes) == 0, f"Got out channels: {out_channels}"
 
-        assert len(dilations) == len(kernel_sizes)
-        assert mode in [CONCAT, ADD], "Valid values for mode are 'concat' and 'add'"
-        assert out_channels % len(dilations) == 0, f"Got out channels: {out_channels}"
-        self.mode = mode
-
-        for d, k in zip(dilations, kernel_sizes):
-            assert (k - 1) % 2 == 0, "kernel sizes must be odd numbers"
-            if ModuleStateController.state == ModuleStateController.TWO_D:
-                branch = self._get_2d_branch(d, k, in_channels, out_channels, stride)
-            else:
-                if "heavy" in kwargs and kwargs['heavy']:
-                    branch = self._get_3d_branch_heavy(d, k, in_channels, out_channels, stride)
-                else:
-                    branch = self._get_3d_branch(d, k, in_channels, out_channels, stride)
-
+        for k in kernel_sizes:
+            pad = (k-1)//2
+            branch = nn.Sequential(
+                nn.Conv2d(in_channels, in_channels, kernel_size=(1, k), padding=(0, pad), groups=in_channels, stride=(stride, stride)),
+                nn.Conv2d(in_channels, in_channels, kernel_size=(k, 1), padding=(pad, 0), groups=in_channels),
+            )
             self.branches.append(branch)
 
-        if mode == CONCAT:
-            self.pw = nn.Sequential(
-                nn.LeakyReLU(),
-                ModuleStateController.conv_op()(in_channels=out_channels * len(dilations), out_channels=out_channels,
-                                                kernel_size=1)
-            )
-
-    def _get_2d_branch(self, d: int, k: int, in_channels: int, out_channels: int, stride: int) -> nn.Sequential:
-        pad = (k - 1) // 2 * d
-        first_op = nn.Conv2d if not self.gated else SpatialGatedConv2d
-        branch = nn.Sequential(
-            first_op(in_channels, out_channels, kernel_size=1),
-            nn.Conv2d(out_channels, out_channels,
-                      kernel_size=(1, k), dilation=d, padding=(0, pad),
-                      groups=out_channels, stride=(stride, stride)),
-            nn.Conv2d(out_channels, out_channels,
-                      kernel_size=(k, 1), dilation=d, padding=(pad, 0),
-                      groups=out_channels),
+        self.pw = nn.Sequential(
+            nn.ReLU(),
+            nn.BatchNorm2d(num_features=in_channels),
+            nn.Conv2d(in_channels=in_channels * len(kernel_sizes), out_channels=out_channels, kernel_size=1)
         )
-
-        if self.apply_norm:
-            branch.insert(1, self.norm_op(num_features=out_channels))
-        return branch
-
-    def _get_3d_branch(self, d: int, k: int, in_channels: int, out_channels: int, stride: int) -> nn.Sequential:
-        pad = (k - 1) // 2 * d
-        branch = nn.Sequential(
-            nn.Conv3d(in_channels, out_channels, kernel_size=1),
-            nn.Conv3d(out_channels, out_channels,
-                      kernel_size=(k, 1, 1), dilation=d, padding=(pad, 0, 0),
-                      groups=out_channels, stride=stride),
-            nn.Conv3d(out_channels, out_channels,
-                      kernel_size=(1, k, 1), dilation=d, padding=(0, pad, 0),
-                      groups=out_channels),
-            nn.Conv3d(out_channels, out_channels,
-                      kernel_size=(1, 1, k), dilation=d, padding=(0, 0, pad),
-                      groups=out_channels),
-        )
-
-        if self.apply_norm:
-            branch.insert(1, self.norm_op(num_features=out_channels))
-        return branch
-
-    def _get_3d_branch_heavy(self, d: int, k: int, in_channels: int, out_channels: int, stride: int) -> nn.Sequential:
-        pad = (k - 1) // 2 * d
-        branch = nn.Sequential(
-            nn.Conv3d(in_channels, out_channels, kernel_size=1),
-            nn.Conv3d(out_channels, out_channels,
-                      kernel_size=(k, k, 1), dilation=d, padding=(pad, pad, 0),
-                      groups=out_channels, stride=stride),
-            nn.Conv3d(out_channels, out_channels,
-                      kernel_size=(1, 1, k), dilation=d, padding=(0, 0, pad),
-                      groups=out_channels),
-        )
-
-        if self.apply_norm:
-            branch.insert(1, self.norm_op(num_features=out_channels))
-        return branch
 
     def forward(self, x):
         output = []
@@ -540,11 +468,7 @@ class XModule(nn.Module):
             output.append(
                 branch(x)
             )
-        if self.mode == CONCAT:
-            return self.pw(torch.concat(output, dim=1))
-        else:
-            return torch.sum(output)
-
+        return self.pw(torch.concat(output, dim=1))
 
 class CBAMResidual(nn.Module):
     def __init__(self, module: dict, channels: int, r: int, mode='concat'):
