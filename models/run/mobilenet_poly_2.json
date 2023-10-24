@@ -1,0 +1,45 @@
+{
+    "LogKwargs": {
+        "backbone": "Mobilenetv2",
+        "conv": "Poly DW",
+        "order": "1, 2",
+        "mode": "sum"
+    },
+    "Tag": "mobilenet-v2",
+    "Children": [
+        {
+            "ComponentClass": "mobilenetv2",
+             "args": {
+                "conv": "Poly",
+                "conv_args": {
+                    "order": [1, 2],
+                    "poly_mode": "sum",
+                    "conv_op": "DWSeperable",
+                    "conv_args":{}
+                }
+            }
+        },
+        {
+            "ComponentClass":"ReLU",
+            "args":{}
+        },
+        {
+            "ComponentClass": "Linear",
+            "args": {
+                "in_features": 1000,
+                "out_features": 256
+            }
+        },
+        {
+            "ComponentClass":"ReLU",
+            "args":{}
+        },
+        {
+            "ComponentClass": "Linear",
+            "args": {
+                "in_features": 256,
+                "out_features": 7
+            }
+        }
+    ]
+}

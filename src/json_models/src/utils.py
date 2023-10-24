@@ -83,6 +83,9 @@ def my_import(class_name: str, dropout_package: str = 'torch.nn'):
     elif class_name == "ReverseLinearBottleneck":
         from src.json_models.src.modules import ReverseLinearBottleneck
         return ReverseLinearBottleneck
+    elif class_name == "DWSeperable":
+        from src.json_models.src.mobile_net.mobilenetv2 import DWSeperable
+        return DWSeperable
     else:
         try:
             module = importlib.import_module(dropout_package)

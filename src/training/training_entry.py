@@ -518,7 +518,7 @@ def ddp_training(rank, world_size: int, dataset_id: int,
     except Exception as e:
         if trainer is not None and trainer.output_dir is not None:
             out_files = glob.glob(f"{trainer.output_dir}/*")
-            if len(out_files) < 2:
+            if len(out_files) < 3:
                 shutil.rmtree(trainer.output_dir)
         raise e
     destroy_process_group()
@@ -583,7 +583,7 @@ def main(fold: int,
         except Exception as e:
             if trainer is not None and trainer.output_dir is not None:
                 out_files = glob.glob(f"{trainer.output_dir}/*")
-                if len(out_files) < 2:
+                if len(out_files) < 3:
                     shutil.rmtree(trainer.output_dir)
             raise e
     else:
