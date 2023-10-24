@@ -10,7 +10,8 @@
         {
             "ComponentClass": "mobilenetv2",
             "args": {
-                "conv_op": "DW"
+                "conv": "DW",
+                "conv_args":{}
             }
         },
         {

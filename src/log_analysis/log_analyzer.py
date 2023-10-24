@@ -85,4 +85,4 @@ class LogAnalyzer:
 
 
 if __name__ == "__main__":
-    LogAnalyzer("/home/andrewheschl/Desktop/log.txt", "")
+    assert False, "Enter the program through the 'analysis_entry.py' file."

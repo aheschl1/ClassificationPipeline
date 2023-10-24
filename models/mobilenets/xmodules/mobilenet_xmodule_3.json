@@ -2,7 +2,7 @@
     "LogKwargs": {
         "backbone": "Mobilenetv2",
         "conv": "XModule",
-        "order": "[3]",
+        "order": "[3, 5]",
         "mode": "NA"
     },
     "Tag": "mobilenet-v2",
@@ -10,9 +10,11 @@
         {
             "ComponentClass": "mobilenetv2",
             "args": {
-                "conv_op": "XModule",
-                "kernel_sizes": [5],
-                "dilations": [1]
+                "conv": "XModule",
+                "conv_args":{
+                    "kernel_sizes": [3, 5],
+                    "dilations": [1, 1]
+                }
             }
         },
         {
