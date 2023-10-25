@@ -44,10 +44,10 @@ class Analysis:
             log_path = f"{folder}/logs.txt"
             if not os.path.exists(log_path):
                 print(f"No log file found in {folder}.")
-                try:
-                    logs.append(LogAnalyzer(log_path, time_stamp))
-                except Exception as e:
-                    print(f"Skipping {log_path}. Likely incomplete log.")
+            try:
+                logs.append(LogAnalyzer(log_path, time_stamp))
+            except Exception as e:
+                print(f"Skipping {log_path}. Likely incomplete log.")
         return logs
 
     def analyze(self):

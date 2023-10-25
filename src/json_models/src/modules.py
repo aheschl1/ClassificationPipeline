@@ -451,8 +451,8 @@ class XModule(nn.Module):
         for k in kernel_sizes:
             pad = (k-1)//2
             branch = nn.Sequential(
-                nn.Conv2d(in_channels, in_channels, kernel_size=(1, k), padding=(0, pad), groups=in_channels, stride=(stride, stride)),
-                nn.Conv2d(in_channels, in_channels, kernel_size=(k, 1), padding=(pad, 0), groups=in_channels),
+                nn.Conv2d(in_channels, in_channels, kernel_size=(1, k), padding=(0, pad), groups=in_channels, stride=(1, stride)),
+                nn.Conv2d(in_channels, in_channels, kernel_size=(k, 1), padding=(pad, 0), groups=in_channels, stride=(stride, 1)),
             )
             self.branches.append(branch)
 
