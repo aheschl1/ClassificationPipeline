@@ -411,7 +411,7 @@ class Trainer:
         :param path: The path to the json architecture definition.
         :return: The pytorch network module.
         """
-
+        shutil.copy(path, f"{self.output_dir}")
         gen = ModelGenerator(json_path=path)
         model = gen.get_model().to(self.device)
         if self.device == 0:
@@ -518,7 +518,7 @@ def ddp_training(rank, world_size: int, dataset_id: int,
     except Exception as e:
         if trainer is not None and trainer.output_dir is not None:
             out_files = glob.glob(f"{trainer.output_dir}/*")
-            if len(out_files) < 3:
+            if len(out_files) < 4:
                 shutil.rmtree(trainer.output_dir)
         raise e
     destroy_process_group()
@@ -583,7 +583,7 @@ def main(fold: int,
         except Exception as e:
             if trainer is not None and trainer.output_dir is not None:
                 out_files = glob.glob(f"{trainer.output_dir}/*")
-                if len(out_files) < 3:
+                if len(out_files) < 4:
                     shutil.rmtree(trainer.output_dir)
             raise e
     else:

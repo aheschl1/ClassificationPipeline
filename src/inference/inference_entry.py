@@ -1,3 +1,4 @@
+import glob
 import sys
 
 from tqdm import tqdm
@@ -6,30 +7,18 @@ from tqdm import tqdm
 sys.path.append("/home/andrew.heschl/Documents/ClassificationPipeline")
 sys.path.append("/home/andrewheschl/PycharmProjects/classification_pipeline")
 sys.path.append("/home/student/andrew/Documents/ClassificationPipeline")
-import logging
 import os.path
-import time
-from typing import Tuple, Dict
+from typing import Dict
 
 import click
-import multiprocessing_logging  # for multiprocess logging https://github.com/jruere/multiprocessing-logging
 import torch
 import torch.nn as nn
-from torch.optim import SGD
 from torch.utils.data import DataLoader
 
 from src.utils.constants import *
-from src.utils.utils import get_dataset_name_from_id, read_json, get_dataloaders_from_fold, get_config_from_dataset, \
+from src.utils.utils import get_dataset_name_from_id, get_config_from_dataset, \
     write_json
 from src.json_models.src.model_generator import ModelGenerator
-from src.json_models.src.modules import ModuleStateController
-import torch.multiprocessing as mp
-from torch.utils.data.distributed import DistributedSampler
-from torch.nn.parallel import DistributedDataParallel as DDP
-from torch.distributed import init_process_group, destroy_process_group
-import torch.distributed as dist
-import datetime
-from torchvision.transforms import Resize
 from src.inference.utils import get_dataset_from_folder
 from src.utils.utils import batch_collate_fn
 
@@ -39,7 +28,6 @@ class Inferer:
                  dataset_id: str,
                  fold: int,
                  result_folder: str,
-                 model_path: str,
                  config_name: str,
                  data_path: str,
                  weights: str
@@ -49,7 +37,6 @@ class Inferer:
         :param dataset_id: The dataset id used for training
         :param fold: The fold to run inference with
         :param result_folder: The folder with the trained weights and config.
-        :param model_path: The path to the model used
         :param config_name: The name of the config to use
         :param data_path: The path to the data to run inference on.
         :param weights: The name of the weights to load.
@@ -58,7 +45,9 @@ class Inferer:
         self.config = get_config_from_dataset(self.dataset_name, config_name)
         self.fold = fold
         self.lookup_root = f"{RESULTS_ROOT}/{self.dataset_name}/fold_{fold}/{result_folder}"
-        self.model_path = model_path
+        print("Searching for model in results folder...")
+        self.model_path = glob.glob(f"{RESULTS_ROOT}/{self.dataset_name}/fold_{fold}/{result_folder}/*.json")[0]
+        print(f"Found {self.model_path}")
         self.weights = weights
         self.data_path = data_path
         assert os.path.exists(self.lookup_root)
@@ -112,9 +101,8 @@ class Inferer:
 @click.option('-data_path', '-data', required=True)
 @click.option('-config', '-c', default='config')
 @click.option('-weights', '-w', default='best')
-def main(dataset_id: str, fold: int, result_folder: str,
-         model_path: str, data_path: str, config: str, weights: str) -> None:
-    inferer = Inferer(dataset_id, fold, result_folder, model_path, config, data_path, weights)
+def main(dataset_id: str, fold: int, result_folder: str, data_path: str, config: str, weights: str) -> None:
+    inferer = Inferer(dataset_id, fold, result_folder, config, data_path, weights)
     inferer.infer()
 
 
