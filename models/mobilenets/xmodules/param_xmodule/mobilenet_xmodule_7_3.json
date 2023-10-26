@@ -1,0 +1,43 @@
+{
+    "LogKwargs": {
+        "backbone": "Mobilenetv2",
+        "conv": "PXModule",
+        "order": "[3, 7]",
+        "mode": "NA"
+    },
+    "Tag": "mobilenet-v2",
+    "Children": [
+        {
+            "ComponentClass": "mobilenetv2",
+            "args": {
+                "conv": "PXModule",
+                "conv_args":{
+                    "kernel_sizes": [3, 7],
+                    "dilations": [1, 1]
+                }
+            }
+        },
+        {
+            "ComponentClass":"ReLU",
+            "args":{}
+        },
+        {
+            "ComponentClass": "Linear",
+            "args": {
+                "in_features": 1000,
+                "out_features": 256
+            }
+        },
+        {
+            "ComponentClass":"ReLU",
+            "args":{}
+        },
+        {
+            "ComponentClass": "Linear",
+            "args": {
+                "in_features": 256,
+                "out_features": 7
+            }
+        }
+    ]
+}

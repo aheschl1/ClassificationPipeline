@@ -50,6 +50,9 @@ def my_import(class_name: str, dropout_package: str = 'torch.nn'):
     elif class_name == "XModule":
         from src.json_models.src.modules import XModule
         return XModule
+    elif class_name == "PXModule":
+        from src.json_models.src.modules import PXModule
+        return PXModule
     elif class_name == "CBAM":
         from src.json_models.src.modules import CBAM
         return CBAM

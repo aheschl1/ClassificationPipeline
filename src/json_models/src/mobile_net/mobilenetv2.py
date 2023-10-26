@@ -72,7 +72,9 @@ class InvertedBlock(nn.Module):
 class MobileNetV2(nn.Module):
     def __init__(self, ch_in=3, conv: str = 'DW', conv_args: Dict = None):
         super(MobileNetV2, self).__init__()
-        assert conv in ['DW', 'Conv', 'Poly', 'PolyFact', 'XModule']
+        assert conv in ['DW', 'Conv', 'Poly', 'XModule', 'PXModule']
+        if conv_args is None:
+            conv_args = {}
         self.configs = [
             # t, c, n, s
             [1, 16, 1, 1],

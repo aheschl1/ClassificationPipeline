@@ -1,19 +1,19 @@
 {
     "LogKwargs": {
         "backbone": "Mobilenetv2",
-        "conv": "Poly",
-        "order": "1, 2, 3",
-        "mode": "sum"
+        "conv": "PXModule",
+        "order": "[3, 5]",
+        "mode": "NA"
     },
     "Tag": "mobilenet-v2",
     "Children": [
         {
             "ComponentClass": "mobilenetv2",
-             "args": {
-                "conv": "Poly",
-                "conv_args": {
-                    "order": [1, 2, 3],
-                    "poly_mode": "sum"
+            "args": {
+                "conv": "PXModule",
+                "conv_args":{
+                    "kernel_sizes": [3, 5],
+                    "dilations": [1, 1]
                 }
             }
         },

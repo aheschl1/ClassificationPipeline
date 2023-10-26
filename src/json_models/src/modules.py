@@ -469,6 +469,46 @@ class XModule(nn.Module):
                 branch(x)
             )
         return self.pw(torch.concat(output, dim=1))
+    
+class PXModule(nn.Module):
+    """
+    """
+
+    def __init__(self, in_channels, out_channels, kernel_sizes=None, stride=1, **kwargs):
+        super(PXModule, self).__init__()
+        if kernel_sizes is None:
+            kernel_sizes = [kwargs['kernel_size']]
+        self.branches = nn.ModuleList()
+
+        # Picl the norm op
+        self.norm_op = nn.BatchNorm2d
+
+        assert out_channels % len(kernel_sizes) == 0, f"Got out channels: {out_channels}"
+
+        self.x_coef = nn.ParameterList([
+            nn.Parameter(torch.ones(1.)) for _ in range(len(kernel_sizes))
+        ])
+        for k in kernel_sizes:
+            pad = (k-1)//2
+            branch = nn.Sequential(
+                nn.Conv2d(in_channels, in_channels, kernel_size=(1, k), padding=(0, pad), groups=in_channels, stride=(1, stride)),
+                nn.Conv2d(in_channels, in_channels, kernel_size=(k, 1), padding=(pad, 0), groups=in_channels, stride=(stride, 1)),
+            )
+            self.branches.append(branch)
+
+        self.pw = nn.Sequential(
+            nn.ReLU(),
+            nn.BatchNorm2d(num_features=in_channels * len(kernel_sizes)),
+            nn.Conv2d(in_channels=in_channels * len(kernel_sizes), out_channels=out_channels, kernel_size=1)
+        )
+
+    def forward(self, x):
+        output = []
+        for i, branch in enumerate(self.branches):
+            output.append(
+                branch(x)*self.x_coef[i]
+            )
+        return self.pw(torch.concat(output, dim=1))
 
 class CBAMResidual(nn.Module):
     def __init__(self, module: dict, channels: int, r: int, mode='concat'):
