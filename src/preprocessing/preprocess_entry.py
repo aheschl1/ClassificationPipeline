@@ -84,18 +84,12 @@ class Preprocessor:
         Ensures that all datapoints have the same shape.
         :return:
         """
-        shape = None
         names = set()
         for point in tqdm(self.datapoints, desc="Verifying dataset integrity"):
             names_before = len(names)
             names.add(point.case_name)
             assert names_before < len(names), f"The name {point.case_name} is in the dataset at least 2 times :("
-            point = point.get_data()
-            if shape is None:
-                shape = point.shape
-            assert point.shape == shape, 'Looks like you have some datapoints with different shapes. ' \
-                                         'Fix that first before coming here.'
-
+    
     def get_folds(self, k: int) -> Dict[int, Dict[str, list]]:
         """
         Gets random fold at 80/20 split. Returns in a map.

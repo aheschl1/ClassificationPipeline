@@ -101,7 +101,7 @@ class SimpleITKReaderWriter(BaseReaderWriter):
 class NaturalReaderWriter(BaseReaderWriter):
 
     def __verify_extension(self, extension: str) -> None:
-        assert extension in ['png', 'jpg', 'npy'], f'Invalid extension {extension} for reader NaturalReaderWriter.'
+        assert extension in ['png', 'jpg', 'npy', 'JPEG'], f'Invalid extension {extension} for reader NaturalReaderWriter.'
 
     def read(self, path: str, store_metadata: bool = False, **kwargs) -> np.array:
         name = path.split('/')[-1]

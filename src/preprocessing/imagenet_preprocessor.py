@@ -58,7 +58,7 @@ class ImagenetPreprocessor(Preprocessor):
         # prepare for val
         val_samples = glob.glob(f"{val_root}/*.JPEG")
         val_data = [(path, 
-                     val_labels.loc['ImageId' == path.split('/')[-1].split('.')[0]]['PredictionString']) 
+                     val_labels.loc[val_labels['ImageId'] == path.split('/')[-1].split('.')[0]].iloc[0]['PredictionString']) 
                      for path in val_samples]
         # val set
         with ThreadPool(self.processes) as pool:
@@ -77,7 +77,12 @@ class ImagenetPreprocessor(Preprocessor):
             os.mkdir(f"{self.raw_root}/{label}")
         except Exception: ...
         # get case name
-
+        case_id = self.current_case
+        self.current_case += 1
+        case_name = get_case_name_from_number(case_id)
+        self.fold['train'].append(case_name)
+        shutil.copy(sample_path, f"{self.raw_root}/{label}/{case_name}.JPEG")
+    
     def _process_val_case(self, data: tuple):
         """
         Process val case and extract label
@@ -101,7 +106,7 @@ class ImagenetPreprocessor(Preprocessor):
             if 'n' in chunk:
                 labels.add(chunk)
         assert len(labels) == 1, f"Error processing prediction string: {prediction_string}"
-        return labels[0]
+        return labels.pop()
 
     @override
     def get_folds(self, k: int) -> Dict[int, Dict[str, list]]:
