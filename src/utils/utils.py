@@ -70,8 +70,8 @@ def verify_case_name(case_name: str) -> None:
     """
     assert 'case_' in case_name, f"Invalid case name {case_name} in one of your folders. Case name " \
                                  "should be format case_xxxxx."
-    assert len(case_name.split('_')[-1]) == 5, f"Invalid case name {case_name} in one of your folders. Case name " \
-                                               "should be format case_xxxxx."
+    assert len(case_name.split('_')[-1]) >= 5, f"Invalid case name {case_name} in one of your folders. Case name " \
+                                               "should be format case_xxxxx, with >= 5 x's"
 
 
 def get_raw_datapoints(dataset_name: str, label_to_id_mapping: Dict[str, int] = None) -> List[Datapoint]:

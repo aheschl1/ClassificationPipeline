@@ -186,6 +186,7 @@ def get_normalizer_from_extension(extension: str) -> Type[Normalizer]:
         'nii.gz': CTNormalizer,
         'png': NaturalImageNormalizer,
         'jpg': NaturalImageNormalizer,
+        'JPEG': NaturalImageNormalizer,
         'npy': NaturalImageNormalizer
     }
     assert extension in mapping.keys(), f"Currently unsupported extension {extension}"

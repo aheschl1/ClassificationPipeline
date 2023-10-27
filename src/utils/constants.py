@@ -34,6 +34,7 @@ INSTANCE = 'instance'
 BATCH = "batch"
 BASE = 'base'
 ECHO = 'echo'
+IMAGENET = 'imagenet'
 NUTRIENT = 'nutrient'
 PATIENT_PATH = "patient_path"
 FILE_NAME = "file_name"

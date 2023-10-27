@@ -134,6 +134,7 @@ def get_reader_writer_from_extension(extension: str) -> Type[BaseReaderWriter]:
         'nii.gz': SimpleITKReaderWriter,
         'png': NaturalReaderWriter,
         'jpg': NaturalReaderWriter,
+        'JPEG': NaturalReaderWriter,
         'npy': NaturalReaderWriter
     }
     assert extension in mapping.keys(), f"Currently unsupported extension {extension}"

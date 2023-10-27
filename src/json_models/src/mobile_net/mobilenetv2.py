@@ -1,7 +1,7 @@
 from typing import Dict
 
 import torch.nn as nn
-from src.json_models.src.modules import PolyWrapper, XModule
+from src.json_models.src.modules import PolyWrapper, XModule, PXModule
 
 
 class DWSeperable(nn.Module):
@@ -43,7 +43,6 @@ def conv3x3(ch_in, ch_out, stride):
 class InvertedBlock(nn.Module):
     def __init__(self, ch_in, ch_out, expand_ratio, stride, conv, conv_args: Dict):
         super(InvertedBlock, self).__init__()
-
         self.stride = stride
         assert stride in [1, 2]
 
@@ -94,6 +93,8 @@ class MobileNetV2(nn.Module):
             conv_op = PolyWrapper
         elif conv == 'XModule':
             conv_op = XModule
+        elif conv == 'PXModule':
+            conv_op = PXModule
 
         self.stem_conv = conv3x3(ch_in, 32, stride=2)
 
@@ -102,8 +103,8 @@ class MobileNetV2(nn.Module):
         for t, c, n, s in self.configs:
             for i in range(n):
                 stride = s if i == 0 else 1
-                layers.append(InvertedBlock(ch_in=input_channel, ch_out=c, expand_ratio=t, stride=stride, conv=conv_op,
-                                            conv_args=conv_args))
+                layers.append(InvertedBlock(ch_in=input_channel, ch_out=c, expand_ratio=t, 
+                                            stride=stride, conv=conv_op, conv_args=conv_args))
                 input_channel = c
 
         self.layers = nn.Sequential(*layers)

@@ -181,10 +181,12 @@ class Preprocessor:
 def get_preprocessor_from_name(name: str) -> Type[Preprocessor]:
     from src.preprocessing.echo_preprocessor import CardiacEchoViewPreprocessor
     from src.preprocessing.nutrient_preprocessor import NutrientPreprocessor
+    from src.preprocessing.imagenet_preprocessor import ImagenetPreprocessor
     return {
         ECHO: CardiacEchoViewPreprocessor,
         BASE: Preprocessor,
-        NUTRIENT: NutrientPreprocessor
+        NUTRIENT: NutrientPreprocessor,
+        IMAGENET: ImagenetPreprocessor
     }[name]
 
 
@@ -197,11 +199,17 @@ def get_preprocessor_from_name(name: str) -> Type[Preprocessor]:
 @click.option('-cardiac_data_root', help="The data root for cardiac data.", required=False)  # echo
 @click.option('-cardiac_csv_path', help="The path to label csv for cardiac data.", required=False)  # echo
 @click.option('-nutrient_data_root', help="The data root for nutrient data.", required=False)  # nutrient
+@click.option('-imagenet_data_root', help="The data root for imagenet data from "+
+              "https://www.kaggle.com/competitions/imagenet-object-localization-challenge/data .", required=False)  # imagenet
 def main(folds: int, processes: int, normalize: bool, dataset_id: str, preprocessor: str,
-         cardiac_data_root: str, cardiac_csv_path: str, nutrient_data_root:str):
-    assert preprocessor in [BASE, ECHO, NUTRIENT], f"Only {BASE} and {ECHO} and {NUTRIENT} are supported preprocessors."
+         cardiac_data_root: str, cardiac_csv_path: str, nutrient_data_root:str, imagenet_data_root: str):
+    assert preprocessor in [BASE, ECHO, NUTRIENT, IMAGENET], f"Only {BASE}, {IMAGENET}, {ECHO} and {NUTRIENT} are supported preprocessors."
     assert not preprocessor == ECHO or (cardiac_data_root is not None and cardiac_csv_path is not None), \
         "You specified echo preprocessor which requires cardiac_data_root and cardiac_csv_path arguments."
+    assert not preprocessor == NUTRIENT or (nutrient_data_root is not None), \
+        "You specified nutrient preprocessor which requires nutrient_data_root argument."
+    assert not preprocessor == IMAGENET or (imagenet_data_root is not None), \
+        "You specified imagenet preprocessor which requires imagenet_data_root argument."
     preprocessor = get_preprocessor_from_name(preprocessor)
     preprocessor = preprocessor(
         dataset_id=dataset_id,
@@ -210,7 +218,8 @@ def main(folds: int, processes: int, normalize: bool, dataset_id: str, preproces
         processes=processes,
         data_root=cardiac_data_root,
         csv_path=cardiac_csv_path,
-        nutrient_data_root=nutrient_data_root
+        nutrient_data_root=nutrient_data_root,
+        imagenet_data_root=imagenet_data_root
     )
     preprocessor.process()
     print("Preprocessing completed!")

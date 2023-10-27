@@ -20,8 +20,7 @@ from multiprocessing.pool import Pool
 class NutrientPreprocessor(Preprocessor):
     def __init__(self, dataset_id: str, folds: int, processes: int, normalize: bool, nutrient_data_root: str, **kwargs):
         """
-        Cardiac view preprocessor subclass. Transforms data from original format to this pipelines format.
-        Also converts data to 2d slices, and applies movement mask.
+        Nutrient data preprocessor subclass. Transforms data from original format to this pipelines format.
         :param dataset_id: The id of the dataset to use.
         :param folds: How many folds to make.
         :param processes: How many processes to use.

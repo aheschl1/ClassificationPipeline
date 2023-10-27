@@ -486,7 +486,7 @@ class PXModule(nn.Module):
         assert out_channels % len(kernel_sizes) == 0, f"Got out channels: {out_channels}"
 
         self.x_coef = nn.ParameterList([
-            nn.Parameter(torch.ones(1.)) for _ in range(len(kernel_sizes))
+            nn.Parameter(torch.ones(1,)) for _ in range(len(kernel_sizes))
         ])
         for k in kernel_sizes:
             pad = (k-1)//2
