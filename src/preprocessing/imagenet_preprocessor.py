@@ -46,7 +46,7 @@ class ImagenetPreprocessor(Preprocessor):
         self._build_output_folder()
         # train stuff
         train_root = f"{self.imagenet_data_root}/ILSVRC/Data/CLS-LOC/train"
-        print("Reading train paths")
+        print("Reading train paths...")
         train_samples = glob.glob(f"{train_root}/*/**.JPEG", recursive=True)
         # val stuff
         val_root = f"{self.imagenet_data_root}/ILSVRC/Data/CLS-LOC/val"
@@ -57,14 +57,14 @@ class ImagenetPreprocessor(Preprocessor):
                 for _ in pool.imap_unordered(self._process_train_case, train_samples):
                     pbar.update()
         # prepare for val
-        print("Reading val paths")
+        print("Reading val paths...")
         val_samples = glob.glob(f"{val_root}/*.JPEG")
         val_data = [(path, 
                      val_labels.loc[val_labels['ImageId'] == path.split('/')[-1].split('.')[0]].iloc[0]['PredictionString']) 
                      for path in val_samples]
         # val set
         with ThreadPool(self.processes) as pool:
-            with tqdm(total=len(train_samples), desc="Processing val cases") as pbar:
+            with tqdm(total=len(val_samples), desc="Processing val cases") as pbar:
                 for _ in pool.imap_unordered(self._process_val_case, val_data):
                     pbar.update()
         super().process()
@@ -112,7 +112,7 @@ class ImagenetPreprocessor(Preprocessor):
 
     @override
     def get_folds(self, k: int) -> Dict[int, Dict[str, list]]:
-        return {'0':self.fold}
+        return {0:self.fold}
 
     @override
     def post_preprocessing(self):

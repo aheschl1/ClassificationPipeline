@@ -71,6 +71,9 @@ class NaturalImageNormalizer(Normalizer):
         means = []
         for data, _, _ in tqdm(dataloader, desc="Calculating mean"):
             assert data.shape[0] == 1, "Expected batch size 1 for mean std calculations. Womp womp"
+            if len(data.shape) == 4:
+                # delete alpha channel
+                data = data[:,:,:,0:3]
             assert len(data.shape) == 3 or data.shape[3] == 3, \
                 f"NaturalImageNormalizer requires three or one channels, and shape [b, h, w, c] or [b, h, w]. Got {data.shape}"
             means.append(torch.mean(data.float(), dim=[0, 1, 2]))
