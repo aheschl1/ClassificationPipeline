@@ -785,16 +785,14 @@ class PolyWrapper(nn.Module):
         if conv_args is None:
             conv_args = {}
         assert len(order) > 0, "Order must be a list of exponents with length > 0."
-        assert poly_mode in ['sum', 'fact']
-        self.fact_mode = poly_mode == 'fact'
+        assert poly_mode in ['sum', 'sumv2']
         conv_op = my_import(conv_op)
+        poly_block = PolyBlock if poly_mode == 'sum' else PolyBlockV2
         self.branches = nn.ModuleList([
-            PolyBlock(in_channels, out_channels, o, stride, conv_op=conv_op, **conv_args) for o in order
+            poly_block(in_channels, out_channels, o, stride, conv_op=conv_op, **conv_args) for o in order
         ])
 
     def forward(self, x):
-        if self.fact_mode:
-            return self._fact_forward(x)
         out = None
         for mod in self.branches:
             if out is None:
@@ -803,18 +801,24 @@ class PolyWrapper(nn.Module):
                 out = torch.add(out, mod(x))
         return out
 
-    def _fact_forward(self, x):
-        out = None
-        first = self.branches[0](x)
 
-        for mod in self.branches[1:]:
-            w = torch.mul(first, mod(x))
-            if out is None:
-                out = w
-            else:
-                out = torch.add(out, w)
-        return out if out is not None else first
+class PolyBlockV2(nn.Module):
+    def __init__(self, in_channels: int, out_channels: int, order: int, stride: int = 1, conv_op=Conv, **conv_args):
+        super().__init__()
+        self.order = order
+        self.conv = conv_op(in_channels, out_channels, kernel_size=conv_args.pop('kernel_size', 3), stride=stride,
+                            **conv_args)
+        self.ch_maxpool = nn.MaxPool3d((in_channels, 1, 1), stride=(in_channels, 1, 1))
+        self.shift = nn.Parameter(torch.ones(1, out_channels, 1, 1))
 
+    def forward(self, x):
+        if self.order == 1:
+            return self.conv(x)
+        x_pow = torch.pow(x, self.order)
+        norm = self.ch_maxpool(torch.abs(x_pow))
+        x_normed = torch.div(x_pow, norm + 1e-7)
+        out = self.conv(x_normed) + self.shift
+        return out
 
 class PolyBlock(nn.Module):
     def __init__(self, in_channels: int, out_channels: int, order: int, stride: int = 1, conv_op=Conv, **conv_args):
