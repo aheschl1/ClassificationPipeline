@@ -89,6 +89,9 @@ def my_import(class_name: str, dropout_package: str = 'torch.nn'):
     elif class_name == "DWSeperable":
         from src.json_models.src.mobile_net.mobilenetv2 import DWSeperable
         return DWSeperable
+    elif class_name == "MultiRoute":
+        from src.json_models.src.modules import MultiRoute
+        return MultiRoute
     else:
         try:
             module = importlib.import_module(dropout_package)

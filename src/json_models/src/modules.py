@@ -802,6 +802,33 @@ class PolyWrapper(nn.Module):
         return out
 
 
+class MultiRoute(nn.Module):
+
+    def __init__(self, in_channels, out_channels, routes: list, stride=1, conv_op='Conv', **conv_args):
+        super().__init__()
+        assert isinstance(routes, list), "routes should be a list, where each entry is the number of convolutions on a path."
+        conv_op = my_import(conv_op)
+        self.branches = nn.ModuleList()
+        for route in routes:
+            assert route > 0, "All route length must be greater than 0."
+            steps = []
+            for i in range(route):
+                steps.append(conv_op(in_channels if i == 0 else out_channels, 
+                                     out_channels, 
+                                     kernel_size=conv_args.pop('kernel_size', 3),
+                                     stride=stride, 
+                                     **conv_args))
+                steps.append(nn.ReLU())
+            self.branches.append(nn.Sequential(*steps))
+    def forward(self, x):
+        out = None
+        for branch in self.branches:
+            if out is None:
+                out = branch(x)
+            else:
+                out = out + branch(x)
+        return out
+
 class PolyBlockV2(nn.Module):
     def __init__(self, in_channels: int, out_channels: int, order: int, stride: int = 1, conv_op=Conv, **conv_args):
         super().__init__()
@@ -810,6 +837,7 @@ class PolyBlockV2(nn.Module):
                             **conv_args)
         self.ch_maxpool = nn.MaxPool3d((in_channels, 1, 1), stride=(in_channels, 1, 1))
         self.shift = nn.Parameter(torch.ones(1, out_channels, 1, 1))
+        self.relu = nn.ReLU()
 
     def forward(self, x):
         if self.order == 1:
@@ -817,7 +845,7 @@ class PolyBlockV2(nn.Module):
         x_pow = torch.pow(x, self.order)
         norm = self.ch_maxpool(torch.abs(x_pow))
         x_normed = torch.div(x_pow, norm + 1e-7)
-        out = self.conv(x_normed) + self.shift
+        out = self.relu(self.conv(x_normed) + self.shift)
         return out
 
 class PolyBlock(nn.Module):

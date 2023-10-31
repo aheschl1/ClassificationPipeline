@@ -1,7 +1,7 @@
 from typing import Dict
 
 import torch.nn as nn
-from src.json_models.src.modules import PolyWrapper, XModule, PXModule
+from src.json_models.src.modules import PolyWrapper, XModule, PXModule, MultiRoute
 
 
 class DWSeperable(nn.Module):
@@ -71,7 +71,7 @@ class InvertedBlock(nn.Module):
 class MobileNetV2(nn.Module):
     def __init__(self, ch_in=3, conv: str = 'DW', conv_args: Dict = None):
         super(MobileNetV2, self).__init__()
-        assert conv in ['DW', 'Conv', 'Poly', 'XModule', 'PXModule']
+        assert conv in ['DW', 'Conv', 'Poly', 'XModule', 'PXModule', 'MultiRoute']
         if conv_args is None:
             conv_args = {}
         self.configs = [
@@ -95,6 +95,8 @@ class MobileNetV2(nn.Module):
             conv_op = XModule
         elif conv == 'PXModule':
             conv_op = PXModule
+        elif conv == 'MultiRoute':
+            conv_op = MultiRoute
 
         self.stem_conv = conv3x3(ch_in, 32, stride=2)
 
