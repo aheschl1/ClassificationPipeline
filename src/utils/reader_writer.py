@@ -7,7 +7,7 @@ import torch
 
 from src.utils.constants import *
 from PIL import Image
-
+from overrides import override
 
 class BaseReaderWriter:
     def __init__(self, case_name: str, dataset_name: str = None):
@@ -120,6 +120,21 @@ class NaturalReaderWriter(BaseReaderWriter):
         np.save(path, data)
 
 
+class ImageNetReaderWriter(NaturalReaderWriter):
+
+    def __verify_extension(self, extension: str) -> None:
+        assert extension in ['JPEG'], f'Invalid extension {extension} for reader ImageNetReaderWriter.'
+
+    @override
+    def read(self, path: str, store_metadata: bool = False, **kwargs) -> np.array:
+        name = path.split('/')[-1]
+        extension = '.'.join(name.split('.')[1:])
+        self.__verify_extension(extension)
+        if extension == 'npy':
+            return np.load(path)
+        image = Image.open(path).convert('RGB')
+        return np.array(image)
+
 def get_reader_writer(io: str) -> Type[BaseReaderWriter]:
     assert io in [SIMPLE_ITK], f'Unrecognized reader/writer {io}.'
     reader_writer_mapping = {
@@ -130,11 +145,12 @@ def get_reader_writer(io: str) -> Type[BaseReaderWriter]:
 
 
 def get_reader_writer_from_extension(extension: str) -> Type[BaseReaderWriter]:
+    # TODO better imagenet detection for reader writer
     mapping = {
         'nii.gz': SimpleITKReaderWriter,
         'png': NaturalReaderWriter,
         'jpg': NaturalReaderWriter,
-        'JPEG': NaturalReaderWriter,
+        'JPEG': ImageNetReaderWriter,
         'npy': NaturalReaderWriter
     }
     assert extension in mapping.keys(), f"Currently unsupported extension {extension}"

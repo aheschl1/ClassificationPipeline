@@ -816,9 +816,10 @@ class MultiRoute(nn.Module):
                 steps.append(conv_op(in_channels if i == 0 else out_channels, 
                                      out_channels, 
                                      kernel_size=conv_args.pop('kernel_size', 3),
-                                     stride=stride, 
+                                     stride=stride if i == 0 else 1, 
                                      **conv_args))
-                steps.append(nn.ReLU())
+                if i != route - 1:
+                    steps.append(nn.ReLU())
             self.branches.append(nn.Sequential(*steps))
     def forward(self, x):
         out = None
@@ -826,7 +827,7 @@ class MultiRoute(nn.Module):
             if out is None:
                 out = branch(x)
             else:
-                out = out + branch(x)
+                out = torch.add(out, branch(x))
         return out
 
 class PolyBlockV2(nn.Module):

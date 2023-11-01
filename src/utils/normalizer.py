@@ -72,9 +72,6 @@ class NaturalImageNormalizer(Normalizer):
         shape_len = None
         for data, _, _ in tqdm(dataloader, desc="Calculating mean"):
             assert data.shape[0] == 1, "Expected batch size 1 for mean std calculations. Womp womp"
-            if len(data.shape) == 4:
-                # delete alpha channel
-                data = data[:,:,:,0:3]
             if shape_len is None:
                 shape_len = len(data.shape)
             assert len(data.shape) == 3 or data.shape[3] == 3, \
