@@ -804,9 +804,12 @@ class PolyWrapper(nn.Module):
 
 class MultiRoute(nn.Module):
 
-    def __init__(self, in_channels, out_channels, routes: list, stride=1, conv_op='Conv', **conv_args):
+    def __init__(self, in_channels, out_channels, routes: list, stride=1, conv_op='Conv', bias=False, **conv_args):
         super().__init__()
         assert isinstance(routes, list), "routes should be a list, where each entry is the number of convolutions on a path."
+        self.bias = bias
+        if bias:
+            self.shifts = nn.ParameterList([nn.Parameter(torch.zeros(1, out_channels, 1, 1)) for _ in range(len(routes))])
         conv_op = my_import(conv_op)
         self.branches = nn.ModuleList()
         for route in routes:
@@ -823,11 +826,14 @@ class MultiRoute(nn.Module):
             self.branches.append(nn.Sequential(*steps))
     def forward(self, x):
         out = None
-        for branch in self.branches:
+        for i, branch in enumerate(self.branches):
             if out is None:
                 out = branch(x)
             else:
-                out = torch.add(out, branch(x))
+                y = branch(x)
+                if self.bias:
+                    y = y + self.shifts[i]
+                out = torch.add(out, y)
         return out
 
 class PolyBlockV2(nn.Module):
