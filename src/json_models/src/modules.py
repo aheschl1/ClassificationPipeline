@@ -780,7 +780,7 @@ class AveragePool(nn.Module):
 
 class PolyWrapper(nn.Module):
     def __init__(self, in_channels, out_channels, order: List[int], stride: int = 1, conv_op='Conv', poly_mode='sum',
-                 conv_args=None):
+                 conv_args=None, **kwargs):
         super().__init__()
         if conv_args is None:
             conv_args = {}

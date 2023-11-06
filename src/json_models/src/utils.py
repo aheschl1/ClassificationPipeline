@@ -92,6 +92,12 @@ def my_import(class_name: str, dropout_package: str = 'torch.nn'):
     elif class_name == "MultiRoute":
         from src.json_models.src.modules import MultiRoute
         return MultiRoute
+    elif class_name == "PolyBlockV2":
+        from src.json_models.src.modules import PolyBlockV2
+        return PolyBlockV2
+    elif class_name == "PolyWrapper":
+        from src.json_models.src.modules import PolyWrapper
+        return PolyWrapper
     else:
         try:
             module = importlib.import_module(dropout_package)

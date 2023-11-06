@@ -7,7 +7,9 @@ from src.utils.reader_writer import get_reader_writer, get_reader_writer_from_ex
 
 
 class Datapoint:
-    def __init__(self, path: str, label: int, dataset_name: str = None,
+    def __init__(self, path: str, 
+                 label: int, 
+                 dataset_name: str = None,
                  case_name: str = None,
                  writer: str = None,
                  normalizer: str = None,

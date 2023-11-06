@@ -1,0 +1,47 @@
+{
+    "LogKwargs": {
+        "backbone": "Mobilenetv2",
+        "conv": "Multi Bias X3",
+        "order": "1, 2, 3",
+        "mode": "NA"
+    },
+    "Tag": "mobilenet-v2",
+    "Children": [
+        {
+            "ComponentClass": "mobilenetv2",
+            "args": {
+                "conv": "MultiRoute",
+                "conv_args":{
+                    "routes":[1, 2, 3],
+                    "conv_op":"XModule",
+                    "bias": true,
+                    "conv_args":{
+                        "kernel_sizes":[3]
+                    }
+                }
+            }
+        },
+        {
+            "ComponentClass":"ReLU",
+            "args":{}
+        },
+        {
+            "ComponentClass": "Linear",
+            "args": {
+                "in_features": 1000,
+                "out_features": 256
+            }
+        },
+        {
+            "ComponentClass":"ReLU",
+            "args":{}
+        },
+        {
+            "ComponentClass": "Linear",
+            "args": {
+                "in_features": 256,
+                "out_features": 7
+            }
+        }
+    ]
+}
