@@ -9,6 +9,8 @@ from src.dataloading.datapoint import Datapoint
 from src.dataloading.dataset import PipelineDataset
 from src.utils.constants import PREPROCESSED_ROOT, RAW_ROOT, CLASSIFICATION, SEGMENTATION
 import matplotlib.pyplot as plt
+import logging
+from tqdm import tqdm
 
 
 def write_json(data: Union[Dict, List], path: str, create_folder: bool = False) -> None:
@@ -86,8 +88,10 @@ def get_raw_datapoints(dataset_name: str, label_to_id_mapping: Dict[str, int] = 
 
     dataset_root = f"{RAW_ROOT}/{dataset_name}"
     datapoints = []
+    logging.info("Reading dataset paths.")
     sample_paths = glob.glob(f"{dataset_root}/*/**")
-    for path in sample_paths:
+    logging.info("Paths reading has completed.")
+    for path in tqdm(sample_paths, desc="Preparing datapoints"):
         # -12 is the label for segmentation to ensure intentionality when building points
         label = label_to_id_mapping[path.split('/')[-2]]
         case_name = path.split('/')[-1].split('.')[0]
@@ -107,13 +111,14 @@ def get_preprocessed_datapoints(dataset_name: str, fold: int) \
     """
     train_root = f"{PREPROCESSED_ROOT}/{dataset_name}/fold_{fold}/train"
     val_root = f"{PREPROCESSED_ROOT}/{dataset_name}/fold_{fold}/val"
+    logging.info("Reading dataset paths.")
     val_paths = glob.glob(f"{val_root}/*")
     train_paths = glob.glob(f"{train_root}/*")
-
+    logging.info("Paths reading has completed.")
     sample_paths = val_paths + train_paths
     train_datapoints, val_datapoints = [], []
     label_case_mapping = get_label_case_mapping_from_dataset(dataset_name)
-    for path in sample_paths:
+    for path in tqdm(sample_paths, desc="Preparing datapoints"):
         name = path.split('/')[-1].split('.')[0]
         # -12 is sentinel value for segmentation labels to ensure intention.
         label = label_case_mapping[name]

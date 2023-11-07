@@ -23,10 +23,10 @@ class PipelineDataset(Dataset):
         self.datapoints = datapoints
         self.transforms = transforms
         self.store_metadata = store_metadata
+        self._num_classes = None
         self.num_classes = self._get_number_of_classes()
         self.preload = preload
         self.dataset_type = dataset_type
-        self._num_classes = None
 
     def _get_number_of_classes(self):
         """
