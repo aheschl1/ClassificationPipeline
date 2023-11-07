@@ -26,17 +26,21 @@ class PipelineDataset(Dataset):
         self.num_classes = self._get_number_of_classes()
         self.preload = preload
         self.dataset_type = dataset_type
+        self._num_classes = None
 
     def _get_number_of_classes(self):
         """
         Checks how many classes there are based on classes of datapoints.
         :return: Number of classes in dataset.
         """
+        if self._num_classes is not None:
+            return self._num_classes
         classes = set()
         for point in self.datapoints:
             classes.add(point.label)
-        return len(classes)
-
+        self._num_classes = len(classes)
+        return self._num_classes
+    
     def __len__(self):
         """
         Gets the length of dataset.
