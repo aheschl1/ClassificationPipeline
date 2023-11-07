@@ -266,8 +266,8 @@ class Trainer:
             self.optim.zero_grad()
             if log_image:
                 self.log_helper.log_image(data[0])
-            data = data.to(self.device)
             labels = labels.to(self.device, non_blocking=True)
+            data = data.to(self.device)
             batch_size = data.shape[0]
             # ForkedPdb().set_trace()
             # do prediction and calculate loss
@@ -293,8 +293,8 @@ class Trainer:
         correct_count = 0.
         total_items = 0
         for data, labels, _ in self.val_dataloader:
-            data = data.to(self.device)
             labels = labels.to(self.device, non_blocking=True)
+            data = data.to(self.device)
             batch_size = data.shape[0]
             # do prediction and calculate loss
             predictions = self.model(data)
@@ -337,8 +337,8 @@ class Trainer:
                     log("First epoch will be slow due to loading workers.")
             self.model.train()
             mean_train_loss = self._train_single_epoch(log_image=(epoch % 10 == 0))
-            self.model.eval()
             scheduler.step()
+            self.model.eval()
             with torch.no_grad():
                 mean_val_loss, val_accuracy = self._eval_single_epoch()
             if self.save_latest:
