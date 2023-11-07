@@ -522,7 +522,7 @@ def ddp_training(rank, world_size: int, dataset_id: int,
         if trainer is not None and trainer.output_dir is not None:
             out_files = glob.glob(f"{trainer.output_dir}/*")
             if len(out_files) < 4:
-                shutil.rmtree(trainer.output_dir)
+                shutil.rmtree(trainer.output_dir, ignore_errors=True)
         raise e
     destroy_process_group()
 
@@ -587,7 +587,7 @@ def main(fold: int,
             if trainer is not None and trainer.output_dir is not None:
                 out_files = glob.glob(f"{trainer.output_dir}/*")
                 if len(out_files) < 4:
-                    shutil.rmtree(trainer.output_dir)
+                    shutil.rmtree(trainer.output_dir,ignore_errors=True)
             raise e
     else:
         raise NotImplementedError('You must set gpus to >= 1')
