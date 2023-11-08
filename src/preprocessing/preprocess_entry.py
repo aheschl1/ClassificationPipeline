@@ -38,7 +38,7 @@ class Preprocessor:
         self.folds = folds
         assert check_raw_exists(self.dataset_name), \
             f"It appears that you haven't created the 'raw/{self.dataset_name}' folder. Womp womp"
-        maybe_make_preprocessed(self.dataset_name, query_overwrite=False)
+        maybe_make_preprocessed(self.dataset_name, query_overwrite=True)
         # We export the config building to a new method
         self.build_config()
 
