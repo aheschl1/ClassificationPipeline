@@ -71,13 +71,13 @@ class Preprocessor:
         :return: None
         """
         config = {
-            'batch_size': 16,
+            'batch_size': 64,
             'processes': self.processes,
             'lr': 0.01,
             'epochs': 100,
-            'momentum': 0.8,
-            'weight_decay': 1e-7,
-            'target_size': [512, 512]
+            'momentum': 0.9,
+            'weight_decay': 0,
+            'target_size': [224, 224]
         }
         write_json(config, f"{PREPROCESSED_ROOT}/{self.dataset_name}/config.json")
 
@@ -169,8 +169,7 @@ class Preprocessor:
                 data = data[0].float()  # Take 0 cause batched
                 if data.shape[-1] == 3 and len(data.shape) == 3:
                     # move channel first
-                    print("Warn, buggy channel management")
-                    data = np.transpose(data, (2, 0, 1))/255
+                    data = np.transpose(data, (2, 0, 1))
                 writer.write(
                     data,
                     f"{PREPROCESSED_ROOT}/{self.dataset_name}/fold_{fold}/{_set}/{point.case_name}."
