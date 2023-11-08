@@ -16,6 +16,7 @@ from typing import Dict, Union, Tuple, Type
 from tqdm import tqdm
 import time
 from PIL import ImageFile
+import numpy as np
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
@@ -166,6 +167,10 @@ class Preprocessor:
                 point = points[0]
                 writer = point.reader_writer
                 data = data[0].float()  # Take 0 cause batched
+                if data.shape[-1] == 3 and len(data.shape) == 3:
+                    # move channel first
+                    print("Warn, buggy channel management")
+                    data = np.transpose(data, (2, 0, 1))/255
                 writer.write(
                     data,
                     f"{PREPROCESSED_ROOT}/{self.dataset_name}/fold_{fold}/{_set}/{point.case_name}."
