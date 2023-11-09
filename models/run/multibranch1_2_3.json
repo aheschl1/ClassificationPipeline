@@ -1,21 +1,23 @@
 {
     "LogKwargs": {
         "backbone": "Mobilenetv2",
-        "conv": "Poly DW",
-        "order": "1, 3",
-        "mode": "sum"
+        "conv": "Multi Bias X3",
+        "order": "1, 2, 3",
+        "mode": "NA"
     },
     "Tag": "mobilenet-v2",
     "Children": [
         {
             "ComponentClass": "mobilenetv2",
-             "args": {
-                "conv": "Poly",
-                "conv_args": {
-                    "order": [1, 3],
-                    "poly_mode": "sum",
-                    "conv_op": "DWSeperable",
-                    "conv_args":{}
+            "args": {
+                "conv": "MultiRoute",
+                "conv_args":{
+                    "routes":[1, 2, 3],
+                    "conv_op":"XModule",
+                    "bias": true,
+                    "conv_args":{
+                        "kernel_sizes":[3]
+                    }
                 }
             }
         },

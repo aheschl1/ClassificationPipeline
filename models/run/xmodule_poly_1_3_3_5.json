@@ -1,7 +1,7 @@
 {
     "LogKwargs": {
         "backbone": "Mobilenetv2",
-        "conv": "Poly DW",
+        "conv": "Poly with X[3, 5]",
         "order": "1, 3",
         "mode": "sum"
     },
@@ -9,13 +9,15 @@
     "Children": [
         {
             "ComponentClass": "mobilenetv2",
-             "args": {
+            "args": {
                 "conv": "Poly",
                 "conv_args": {
-                    "order": [1, 3],
-                    "poly_mode": "sum",
-                    "conv_op": "DWSeperable",
-                    "conv_args":{}
+                  "order": [1, 3],
+                  "poly_mode": "sum",
+                  "conv_op": "XModule",
+                    "conv_args": {
+                      "kernel_sizes": [3, 5]
+                    }
                 }
             }
         },
