@@ -1,2 +1,0 @@
-Best Accuracy,Best Loss,Best Epoch,Mean Time (S),Total Params,Untrainable Params,Criterion,Optimizer,Timestamp,GPU Count,backbone,conv,order,mode,batch_size,processes,lr,epochs,momentum,weight_decay,target_size
-0.27477,1.77493,6,12.4332,3927183,0,nn.CrossEntropyLoss(),SGD,2023_10_13_00_31_485732,1,Mobilenetv2,XModule,[3],NA,32,32,0.01,100,0.9,0,"[224, 224]"
