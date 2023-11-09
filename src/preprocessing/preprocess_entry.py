@@ -75,7 +75,7 @@ class Preprocessor:
             'processes': self.processes,
             'lr': 0.01,
             'epochs': 100,
-            'momentum': 0.9,
+            'momentum': 0,
             'weight_decay': 0,
             'target_size': [224, 224]
         }

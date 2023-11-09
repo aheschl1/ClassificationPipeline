@@ -17,7 +17,7 @@ import click
 import multiprocessing_logging  # for multiprocess logging https://github.com/jruere/multiprocessing-logging
 import torch
 import torch.nn as nn
-from torch.optim import SGD
+from torch.optim import SGD, Adam
 from torch.utils.data import DataLoader
 import shutil
 from sklearn.metrics import confusion_matrix
@@ -236,8 +236,7 @@ class Trainer:
             transforms.RandomRotation(degrees=20),
             transforms.RandomAdjustSharpness(1.5),
             transforms.RandomVerticalFlip(p=0.25, ),
-            transforms.RandomHorizontalFlip(p=0.25, ),
-            transforms.RandomGrayscale(p=0.1)
+            transforms.RandomHorizontalFlip(p=0.25, )
         ])
         val_transforms = transforms.Compose([
             Resize(self.config.get('target_size', [512, 512]), antialias=True),
