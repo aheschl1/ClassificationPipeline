@@ -1,0 +1,18 @@
+{
+    "LogKwargs": {
+        "backbone": "EfficientNetB0",
+        "conv": "DW",
+        "order": "NA",
+        "mode": "NA"
+    },
+    "Tag": "mobilenet-v2",
+    "Children": [
+        {
+            "ComponentClass": "enb6",
+            "args": {
+                "conv_op": "Conv2d",
+                "conv_args":{}
+            }
+        }
+    ]
+}
