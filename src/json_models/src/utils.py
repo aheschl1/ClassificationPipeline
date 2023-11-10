@@ -10,6 +10,10 @@ def my_import(class_name: str, dropout_package: str = 'torch.nn'):
     :param dropout_package: The package to look into of the class isn't in the if/else statements
     :return: Any object defined in this long if/else sequence.
     """
+    if class_name == 'mobilenet':
+        from torchvision.models import mobilenet_v2
+        return mobilenet_v2
+    
     # check premades
     if class_name == 'mobilenetv2':
         from src.json_models.src.mobile_net.mobilenetv2 import MobileNetV2
