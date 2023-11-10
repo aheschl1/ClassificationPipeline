@@ -28,11 +28,12 @@ class ModelGenerator:
         else:
             self.log_kwargs = None
         if 'Only' in model_definition.keys():
+            import torchvision.models as models
             # This is to be used if you just want to point to a pre-writen network
             model = my_import(model_definition['Only']['ComponentClass'])
             print("==================This code sucks=================")
             self.model = nn.Sequential(
-                model(),
+                models.efficientnet_b0(),
                 nn.ReLU(),
                 nn.Linear(1000, 102)
             )

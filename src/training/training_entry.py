@@ -236,7 +236,8 @@ class Trainer:
             transforms.RandomRotation(degrees=20),
             transforms.RandomAdjustSharpness(1.5),
             transforms.RandomVerticalFlip(p=0.25, ),
-            transforms.RandomHorizontalFlip(p=0.25, )
+            transforms.RandomHorizontalFlip(p=0.25, ),
+            transforms.GaussianBlur(3),
         ])
         val_transforms = transforms.Compose([
             Resize(self.config.get('target_size', [512, 512]), antialias=True),
