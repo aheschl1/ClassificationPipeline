@@ -1,0 +1,7 @@
+{
+    "Only":{
+        "ComponentClass": "mobilenet",
+        "args": {
+        }
+    }
+}

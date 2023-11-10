@@ -3,7 +3,7 @@
         "backbone": "Mobilenetv2",
         "conv": "Poly",
         "order": "1, 2, 3",
-        "mode": "fact"
+        "mode": "sum"
     },
     "Tag": "mobilenet-v2",
     "Children": [
@@ -13,7 +13,7 @@
                 "conv": "Poly",
                 "conv_args": {
                     "order": [1, 2, 3],
-                    "poly_mode": "fact"
+                    "poly_mode": "sum"
                 }
             }
         },
@@ -36,7 +36,7 @@
             "ComponentClass": "Linear",
             "args": {
                 "in_features": 256,
-                "out_features": 7
+                "out_features": 102
             }
         }
     ]
