@@ -13,6 +13,17 @@
                 "conv": "DW",
                 "conv_args":{}
             }
-        }
+        },
+	{
+	    "ComponentClass": "ReLU",
+	    "args":{}
+	},
+	{
+	    "ComponentClass": "Linear",
+	    "args":{
+	        "in_features": 1000,
+		"out_features": 102
+	    }
+	}
     ]
 }
