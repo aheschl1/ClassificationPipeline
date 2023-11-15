@@ -20,7 +20,8 @@ def maybe_make_preprocessed(dataset_name: str, query_overwrite: bool = True) -> 
         if not remove:
             print("Killing program.")
             raise SystemExit
-        shutil.rmtree(target_folder)
+        print("Clearing the preprocessed folder. This may take a while depending on how large the dataset is...")
+        shutil.rmtree(target_folder, ignore_errors=True)
     os.makedirs(target_folder, exist_ok=True)
 
 

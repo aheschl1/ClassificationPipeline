@@ -17,7 +17,7 @@ import click
 import multiprocessing_logging  # for multiprocess logging https://github.com/jruere/multiprocessing-logging
 import torch
 import torch.nn as nn
-from torch.optim import SGD
+from torch.optim import SGD, Adam
 from torch.utils.data import DataLoader
 import shutil
 from sklearn.metrics import confusion_matrix
@@ -161,7 +161,7 @@ class Trainer:
             self._load_checkpoint(checkpoint_name)
         self.loss = self._get_loss()
         self.optim = self._get_optim()
-        log(f"Trainer finished initialized on rank {gpu_id}.")
+        log(f"Trainer finished initialization on rank {gpu_id}.")
         if self.world_size > 1:
             dist.barrier()
 
@@ -237,7 +237,7 @@ class Trainer:
             transforms.RandomAdjustSharpness(1.5),
             transforms.RandomVerticalFlip(p=0.25, ),
             transforms.RandomHorizontalFlip(p=0.25, ),
-            transforms.RandomGrayscale(p=0.1)
+            transforms.GaussianBlur(3),
         ])
         val_transforms = transforms.Compose([
             Resize(self.config.get('target_size', [512, 512]), antialias=True),
@@ -423,11 +423,11 @@ class Trainer:
             self.log_helper.log_net_structure(model, self.train_transforms(
                 torch.randn(1, *self.data_shape, device=torch.device(self.device))
             ))
-        all_params = sum(param.numel() for param in model.parameters())
-        trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-        log(f"Total paramaters: {all_params}")
-        log(f"Trainable params: {trainable_params}")
-        self.log_helper.log_parameters(all_params, trainable_params)
+            all_params = sum(param.numel() for param in model.parameters())
+            trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+            log(f"Total paramaters: {all_params}")
+            log(f"Trainable params: {trainable_params}")
+            self.log_helper.log_parameters(all_params, trainable_params)
         return model
 
     def _load_checkpoint(self, weights_name) -> None:

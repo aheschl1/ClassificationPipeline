@@ -1,8 +1,8 @@
 {
     "LogKwargs": {
         "backbone": "Mobilenetv2",
-        "conv": "DW",
-        "order": "NA",
+        "conv": "Multi Bias X3",
+        "order": "1, 2, 3",
         "mode": "NA"
     },
     "Tag": "mobilenet-v2",
@@ -10,8 +10,15 @@
         {
             "ComponentClass": "mobilenetv2",
             "args": {
-                "conv": "DW",
-                "conv_args":{}
+                "conv": "MultiRoute",
+                "conv_args":{
+                    "routes":[1, 2, 3],
+                    "conv_op":"XModule",
+                    "bias": true,
+                    "conv_args":{
+                        "kernel_sizes":[3]
+                    }
+                }
             }
         },
         {

@@ -16,6 +16,7 @@ from typing import Dict, Union, Tuple, Type
 from tqdm import tqdm
 import time
 from PIL import ImageFile
+import numpy as np
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
@@ -38,7 +39,7 @@ class Preprocessor:
         self.folds = folds
         assert check_raw_exists(self.dataset_name), \
             f"It appears that you haven't created the 'raw/{self.dataset_name}' folder. Womp womp"
-        maybe_make_preprocessed(self.dataset_name, query_overwrite=False)
+        maybe_make_preprocessed(self.dataset_name, query_overwrite=True)
         # We export the config building to a new method
         self.build_config()
 
@@ -70,13 +71,13 @@ class Preprocessor:
         :return: None
         """
         config = {
-            'batch_size': 16,
+            'batch_size': 64,
             'processes': self.processes,
             'lr': 0.01,
             'epochs': 100,
-            'momentum': 0.8,
-            'weight_decay': 1e-7,
-            'target_size': [512, 512]
+            'momentum': 0,
+            'weight_decay': 0,
+            'target_size': [224, 224]
         }
         write_json(config, f"{PREPROCESSED_ROOT}/{self.dataset_name}/config.json")
 
@@ -166,6 +167,9 @@ class Preprocessor:
                 point = points[0]
                 writer = point.reader_writer
                 data = data[0].float()  # Take 0 cause batched
+                if data.shape[-1] == 3 and len(data.shape) == 3:
+                    # move channel first
+                    data = np.transpose(data, (2, 0, 1))
                 writer.write(
                     data,
                     f"{PREPROCESSED_ROOT}/{self.dataset_name}/fold_{fold}/{_set}/{point.case_name}."

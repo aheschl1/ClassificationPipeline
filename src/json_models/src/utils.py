@@ -10,21 +10,35 @@ def my_import(class_name: str, dropout_package: str = 'torch.nn'):
     :param dropout_package: The package to look into of the class isn't in the if/else statements
     :return: Any object defined in this long if/else sequence.
     """
+    if class_name == 'mobilenet':
+        from torchvision.models import mobilenet_v2
+        return mobilenet_v2
+    
     # check premades
     if class_name == 'mobilenetv2':
         from src.json_models.src.mobile_net.mobilenetv2 import MobileNetV2
         return MobileNetV2
     # Here checks backbones
-    if class_name == ENB6:
+    if class_name == ENB6_P:
         return models.efficientnet_b6
-    elif class_name == ENV2:
+    elif class_name == ENV2_P:
         return models.efficientnet_v2_l
-    elif class_name == ENB4:
+    elif class_name == ENB4_P:
         return models.efficientnet_b4
-    elif class_name == ENB0:
+    elif class_name == ENB0_P:
         return models.efficientnet_b0
-    elif class_name == ENB1:
+    elif class_name == ENB1_P:
         return models.efficientnet_b1
+
+    if class_name == ENB0:
+        from src.json_models.src.efficientnet.efficientnet import EfficientNetB0
+        return EfficientNetB0
+    if class_name == ENB1:
+        from src.json_models.src.efficientnet.efficientnet import EfficientNetB1
+        return EfficientNetB1
+    if class_name == ENB6:
+        from src.json_models.src.efficientnet.efficientnet import EfficientNetB6
+        return EfficientNetB6
     # Here checks modules
     if class_name == 'UpsamplingConv':
         from src.json_models.src.modules import UpsamplingConv

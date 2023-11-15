@@ -1,15 +1,25 @@
 {
-    "Tag": "efficientnet-b0",
+    "LogKwargs": {
+        "backbone": "Mobilenetv2",
+        "conv": "Multi Bias X3",
+        "order": "1, 2",
+        "mode": "NA"
+    },
+    "Tag": "mobilenet-v2",
     "Children": [
         {
-            "ComponentClass": "enb0",
+            "ComponentClass": "mobilenetv2",
             "args": {
-                "weights": "EfficientNet_B0_Weights.IMAGENET1K_V1"
+                "conv": "MultiRoute",
+                "conv_args":{
+                    "routes":[1, 2],
+                    "conv_op":"XModule",
+                    "bias": true,
+                    "conv_args":{
+                        "kernel_sizes":[3]
+                    }
+                }
             }
-        },
-        {
-            "ComponentClass": "Flatten",
-            "args": {}
         },
         {
             "ComponentClass":"ReLU",
@@ -30,7 +40,7 @@
             "ComponentClass": "Linear",
             "args": {
                 "in_features": 256,
-                "out_features": 7
+                "out_features": 102
             }
         }
     ]

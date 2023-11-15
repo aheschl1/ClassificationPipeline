@@ -26,6 +26,12 @@ ENV2 = 'env2'
 ENB0 = 'enb0'
 ENB1 = "enb1"
 
+ENB6_P = 'enb6p'
+ENB4_P = 'enb4p'
+ENV2_P = 'env2p'
+ENB0_P = 'enb0p'
+ENB1_P = "enb1p"
+
 CONCAT = 'concat'
 ADD = 'add'
 TWO_D = '2d'

@@ -1,20 +1,17 @@
 {
     "LogKwargs": {
         "backbone": "Mobilenetv2",
-        "conv": "Poly",
-        "order": "1, 2, 3",
-        "mode": "fact"
+        "conv": "DW",
+        "order": "NA",
+        "mode": "NA"
     },
     "Tag": "mobilenet-v2",
     "Children": [
         {
             "ComponentClass": "mobilenetv2",
-             "args": {
-                "conv": "Poly",
-                "conv_args": {
-                    "order": [1, 2, 3],
-                    "poly_mode": "fact"
-                }
+            "args": {
+                "conv": "DW",
+                "conv_args":{}
             }
         },
         {
@@ -36,7 +33,7 @@
             "ComponentClass": "Linear",
             "args": {
                 "in_features": 256,
-                "out_features": 7
+                "out_features": 102
             }
         }
     ]

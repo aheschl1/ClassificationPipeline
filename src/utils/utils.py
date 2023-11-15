@@ -274,9 +274,14 @@ def get_dataloaders_from_fold(dataset_name: str, fold: int,
         val_sampler = kwargs['sampler'](val_dataset, rank=kwargs['rank'],
                                         num_replicas=kwargs['world_size'], shuffle=False)
 
+
+    batch_size = kwargs.get('batch_size', config['batch_size'])
+    if 'world_size' in kwargs:
+        batch_size //= kwargs['world_size']
+
     train_dataloader = DataLoader(
         train_dataset,
-        batch_size=kwargs.get('batch_size', config['batch_size']),
+        batch_size=batch_size,
         num_workers=config['processes'],
         shuffle=train_sampler is None,
         pin_memory=False,
@@ -287,7 +292,7 @@ def get_dataloaders_from_fold(dataset_name: str, fold: int,
 
     val_dataloader = DataLoader(
         val_dataset,
-        batch_size=kwargs.get('batch_size', config['batch_size']),
+        batch_size=batch_size,
         num_workers=config['processes'],
         shuffle=False,
         pin_memory=False,

@@ -1,18 +1,15 @@
 {
-    "LogKwargs": {
-        "backbone": "Mobilenetv2",
-        "conv": "DW",
-        "order": "NA",
-        "mode": "NA"
-    },
-    "Tag": "mobilenet-v2",
+    "Tag": "efficientnet-b0",
     "Children": [
         {
-            "ComponentClass": "mobilenetv2",
+            "ComponentClass": "enb0",
             "args": {
-                "conv": "DW",
-                "conv_args":{}
+                "weights": "EfficientNet_B0_Weights.IMAGENET1K_V1"
             }
+        },
+        {
+            "ComponentClass": "Flatten",
+            "args": {}
         },
         {
             "ComponentClass":"ReLU",

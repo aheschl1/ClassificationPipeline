@@ -28,10 +28,15 @@ class ModelGenerator:
         else:
             self.log_kwargs = None
         if 'Only' in model_definition.keys():
+            import torchvision.models as models
             # This is to be used if you just want to point to a pre-writen network
             model = my_import(model_definition['Only']['ComponentClass'])
-            print("Ignoring args for 'Only' json definition.")
-            self.model = model
+            print("==================This code sucks=================")
+            self.model = nn.Sequential(
+                models.efficientnet_b0(),
+                nn.ReLU(),
+                nn.Linear(1000, 102)
+            )
             return
         if "Encoder" in model_definition.keys():
             ModelGenerator.verify_unet_structure(model_definition)
