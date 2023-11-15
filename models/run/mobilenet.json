@@ -3,7 +3,7 @@
         "backbone": "Mobilenetv2",
         "conv": "DW",
         "order": "NA",
-        "mode": "NA"
+        "mode": "Baseline"
     },
     "Tag": "mobilenet-v2",
     "Children": [

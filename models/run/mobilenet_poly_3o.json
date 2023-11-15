@@ -1,7 +1,7 @@
 {
     "LogKwargs": {
         "backbone": "Mobilenetv2",
-        "conv": "Poly DW",
+        "conv": "Poly",
         "order": "3",
         "mode": "sum"
     },
@@ -14,7 +14,6 @@
                 "conv_args": {
                     "order": [3],
                     "poly_mode": "sum",
-                    "conv_op": "DWSeperable",
                     "conv_args":{}
                 }
             }
