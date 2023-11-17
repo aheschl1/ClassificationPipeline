@@ -449,7 +449,7 @@ class XModule(nn.Module):
         assert out_channels % len(kernel_sizes) == 0, f"Got out channels: {out_channels}"
 
         for k in kernel_sizes:
-            pad = (k-1)//2
+            pad = (k - 1) // 2
             branch = nn.Sequential(
                 nn.Conv2d(in_channels, in_channels, kernel_size=(1, k), padding=(0, pad), groups=in_channels, stride=(1, stride)),
                 nn.Conv2d(in_channels, in_channels, kernel_size=(k, 1), padding=(pad, 0), groups=in_channels, stride=(stride, 1)),
@@ -469,7 +469,8 @@ class XModule(nn.Module):
                 branch(x)
             )
         return self.pw(torch.concat(output, dim=1))
-    
+
+
 class PXModule(nn.Module):
     """
     """
@@ -486,10 +487,10 @@ class PXModule(nn.Module):
         assert out_channels % len(kernel_sizes) == 0, f"Got out channels: {out_channels}"
 
         self.x_coef = nn.ParameterList([
-            nn.Parameter(torch.ones(1,)) for _ in range(len(kernel_sizes))
+            nn.Parameter(torch.ones(1, )) for _ in range(len(kernel_sizes))
         ])
         for k in kernel_sizes:
-            pad = (k-1)//2
+            pad = (k - 1) // 2
             branch = nn.Sequential(
                 nn.Conv2d(in_channels, in_channels, kernel_size=(1, k), padding=(0, pad), groups=in_channels, stride=(1, stride)),
                 nn.Conv2d(in_channels, in_channels, kernel_size=(k, 1), padding=(pad, 0), groups=in_channels, stride=(stride, 1)),
@@ -506,9 +507,10 @@ class PXModule(nn.Module):
         output = []
         for i, branch in enumerate(self.branches):
             output.append(
-                branch(x)*self.x_coef[i]
+                branch(x) * self.x_coef[i]
             )
         return self.pw(torch.concat(output, dim=1))
+
 
 class CBAMResidual(nn.Module):
     def __init__(self, module: dict, channels: int, r: int, mode='concat'):
@@ -816,14 +818,15 @@ class MultiRoute(nn.Module):
             assert route > 0, "All route length must be greater than 0."
             steps = []
             for i in range(route):
-                steps.append(conv_op(in_channels if i == 0 else out_channels, 
-                                     out_channels, 
+                steps.append(conv_op(in_channels if i == 0 else out_channels,
+                                     out_channels,
                                      kernel_size=conv_args.pop('kernel_size', 3),
-                                     stride=stride if i == 0 else 1, 
+                                     stride=stride if i == 0 else 1,
                                      **conv_args))
                 if i != route - 1:
                     steps.append(nn.ReLU())
             self.branches.append(nn.Sequential(*steps))
+
     def forward(self, x):
         out = None
         for i, branch in enumerate(self.branches):
@@ -835,6 +838,7 @@ class MultiRoute(nn.Module):
                     y = y + self.shifts[i]
                 out = torch.add(out, y)
         return out
+
 
 class PolyBlockV2(nn.Module):
     def __init__(self, in_channels: int, out_channels: int, order: int, stride: int = 1, conv_op=Conv, **conv_args):
@@ -854,6 +858,7 @@ class PolyBlockV2(nn.Module):
         x_normed = torch.div(x_pow, norm + 1e-7)
         out = self.relu(self.conv(x_normed) + self.shift)
         return out
+
 
 class PolyBlock(nn.Module):
     def __init__(self, in_channels: int, out_channels: int, order: int, stride: int = 1, conv_op=Conv, **conv_args):
