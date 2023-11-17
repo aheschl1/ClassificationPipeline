@@ -35,6 +35,9 @@ class LogAnalyzer:
         # config
         log_file.readline()
         self.config = eval(readline())
+        # path reading
+        log_file.readline()
+        log_file.readline()
         # model kwargs
         log_file.readline()
         self.model_kwargs = eval(readline())
