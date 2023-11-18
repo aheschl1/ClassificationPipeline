@@ -878,3 +878,36 @@ class PolyBlock(nn.Module):
         x_normed = torch.div(x_pow, norm + 1e-7)
         out = self.conv(x_normed)
         return out
+
+
+class MultiBatchNorm(nn.Module):
+    def __init__(self, num_features, momentum=0.1):
+        super().__init__()
+        self.momentum = momentum
+        self.y = nn.Parameter(torch.ones((1, num_features, 1, 1)))
+        self.b = nn.Parameter(torch.zeros((1, num_features, 1, 1)))
+
+        self.register_buffer('running_mean', torch.zeros((1, num_features, 1, 1)))
+        self.register_buffer('running_std', torch.ones((1, num_features, 1, 1)))
+
+    def _train_forward(self, x):
+        mean = torch.mean(x, dim=(0, 2, 3), keepdim=True)
+        var = ((x-mean)**2).mean(dim=(0, 2, 3), keepdim=True)
+        std = torch.sqrt(var+1e-7)
+        x = (x - mean) / std
+        x = self.y * x + self.b
+        # update stats
+        self.running_mean = (1 - self.momentum) * self.running_mean + self.momentum * mean
+        self.running_std = (1 - self.momentum) * self.running_std + self.momentum * std
+        return x
+
+    def _eval_forward(self, x):
+        x = (x - self.running_mean) / self.running_std
+        x = x * self.y + self.b
+        return x
+
+    def forward(self, x):
+        if self.training:
+            return self._train_forward(x)
+        return self._eval_forward(x)
+
