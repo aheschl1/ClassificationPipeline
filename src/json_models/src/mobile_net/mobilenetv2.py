@@ -1,16 +1,17 @@
 from typing import Dict
 
 import torch.nn as nn
-from src.json_models.src.modules import PolyWrapper, XModule, PXModule, MultiRoute
+from src.json_models.src.modules import PolyWrapper, XModule, PXModule, MultiRoute, MultiBatchNorm
 
 
 class DWSeperable(nn.Module):
     def __init__(self, in_channels, out_channels, stride, **kwargs):
         super().__init__()
+        norm_op = kwargs.get('norm_op', nn.BatchNorm2d)
         self.net = nn.Sequential(
             # depthwise
             nn.Conv2d(in_channels, in_channels, kernel_size=3, padding=1, stride=stride, groups=in_channels, bias=False),
-            nn.BatchNorm2d(in_channels),
+            norm_op(in_channels),
             nn.ReLU6(inplace=True),
             # point
             nn.Conv2d(in_channels, out_channels, kernel_size=1, padding=0, stride=1, bias=False),
@@ -20,28 +21,28 @@ class DWSeperable(nn.Module):
         return self.net(x)
 
 
-def conv1x1(ch_in, ch_out):
+def conv1x1(ch_in, ch_out, norm_op=nn.BatchNorm2d):
     return (
         nn.Sequential(
             nn.Conv2d(ch_in, ch_out, kernel_size=1, padding=0, stride=1, bias=False),
-            nn.BatchNorm2d(ch_out),
+            norm_op(ch_out),
             nn.ReLU6(inplace=True)
         )
     )
 
 
-def conv3x3(ch_in, ch_out, stride):
+def conv3x3(ch_in, ch_out, stride, norm_op=nn.BatchNorm2d):
     return (
         nn.Sequential(
             nn.Conv2d(ch_in, ch_out, kernel_size=3, padding=1, stride=stride, bias=False),
-            nn.BatchNorm2d(ch_out),
+            norm_op(ch_out),
             nn.ReLU6(inplace=True)
         )
     )
 
 
 class InvertedBlock(nn.Module):
-    def __init__(self, ch_in, ch_out, expand_ratio, stride, conv, conv_args: Dict):
+    def __init__(self, ch_in, ch_out, expand_ratio, stride, conv, conv_args: Dict, norm_op=nn.BatchNorm2d):
         super(InvertedBlock, self).__init__()
         self.stride = stride
         assert stride in [1, 2]
@@ -55,7 +56,7 @@ class InvertedBlock(nn.Module):
 
         layers.extend([
             conv(hidden_dim, ch_out, stride=stride, **conv_args),
-            nn.BatchNorm2d(ch_out),
+            norm_op(ch_out),
             nn.ReLU6()
         ])
 
@@ -69,7 +70,7 @@ class InvertedBlock(nn.Module):
 
 
 class MobileNetV2(nn.Module):
-    def __init__(self, ch_in=3, conv: str = 'DW', conv_args: Dict = None):
+    def __init__(self, ch_in=3, conv: str = 'DW', conv_args: Dict = None, norm_op="BatchNorm2d"):
         super(MobileNetV2, self).__init__()
         assert conv in ['DW', 'Conv', 'Poly', 'XModule', 'PXModule', 'MultiRoute']
         if conv_args is None:
@@ -97,8 +98,13 @@ class MobileNetV2(nn.Module):
             conv_op = PXModule
         elif conv == 'MultiRoute':
             conv_op = MultiRoute
+        
+        if norm_op=="BatchNorm2d":
+            norm_op=nn.BatchNorm2d
+        else:
+            norm_op=MultiBatchNorm
 
-        self.stem_conv = conv3x3(ch_in, 32, stride=2)
+        self.stem_conv = conv3x3(ch_in, 32, stride=2, norm_op=norm_op)
 
         layers = []
         input_channel = 32
@@ -106,12 +112,12 @@ class MobileNetV2(nn.Module):
             for i in range(n):
                 stride = s if i == 0 else 1
                 layers.append(InvertedBlock(ch_in=input_channel, ch_out=c, expand_ratio=t, 
-                                            stride=stride, conv=conv_op, conv_args=conv_args))
+                                            stride=stride, conv=conv_op, conv_args=conv_args, norm_op=norm_op))
                 input_channel = c
 
         self.layers = nn.Sequential(*layers)
 
-        self.last_conv = conv1x1(input_channel, 1280)
+        self.last_conv = conv1x1(input_channel, 1280, norm_op=norm_op)
 
         self.classifier = nn.Sequential(
             nn.Dropout(0.2),
