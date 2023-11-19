@@ -887,15 +887,31 @@ class MultiBatchNorm(nn.Module):
         self.y = nn.Parameter(torch.ones((1, num_features, 1, 1)))
         self.b = nn.Parameter(torch.zeros((1, num_features, 1, 1)))
 
+        self.y2 = nn.Parameter(torch.ones((1, num_features, 1, 1)))
+        self.b2 = nn.Parameter(torch.zeros((1, num_features, 1, 1)))
+
+        self.y3 = nn.Parameter(torch.ones((1, num_features, 1, 1)))
+        self.b3 = nn.Parameter(torch.zeros((1, num_features, 1, 1)))
+
         self.register_buffer('running_mean', torch.zeros((1, num_features, 1, 1)))
         self.register_buffer('running_std', torch.ones((1, num_features, 1, 1)))
+
+        self.adaptive_avg = nn.AdaptiveAvgPool2d(1)
+        self.linear = nn.Sequential(
+            nn.Linear(num_features, 3),
+            nn.Sigmoid()
+        )
 
     def _train_forward(self, x):
         mean = torch.mean(x, dim=(0, 2, 3), keepdim=True)
         var = ((x-mean)**2).mean(dim=(0, 2, 3), keepdim=True)
         std = torch.sqrt(var+1e-7)
         x = (x - mean) / std
-        x = self.y * x + self.b
+        # calculate
+        x_b = self.adaptive_avg(x).squeeze(dim=(2, 3))
+        x_b = self.linear(x_b)
+        # do da shift
+        x = x_b[:, 0:1].unsqueeze(2).unsqueeze(3)*(self.y * x + self.b) + x_b[:, 1:2].unsqueeze(2).unsqueeze(3)*(self.y2 * x + self.b2) + x_b[:, 2:].unsqueeze(2).unsqueeze(3)*(self.y3 * x + self.b3)
         # update stats
         self.running_mean = (1 - self.momentum) * self.running_mean + self.momentum * mean
         self.running_std = (1 - self.momentum) * self.running_std + self.momentum * std
@@ -903,7 +919,10 @@ class MultiBatchNorm(nn.Module):
 
     def _eval_forward(self, x):
         x = (x - self.running_mean) / self.running_std
-        x = x * self.y + self.b
+        x_b = self.adaptive_avg(x).squeeze(dim=(2, 3))
+        x_b = self.linear(x_b)
+        # do da shift
+        x = x_b[:, 0:1].unsqueeze(2).unsqueeze(3)*(self.y * x + self.b) + x_b[:, 1:2].unsqueeze(2).unsqueeze(3)*(self.y2 * x + self.b2) + x_b[:, 2:].unsqueeze(2).unsqueeze(3)*(self.y3 * x + self.b3)
         return x
 
     def forward(self, x):
