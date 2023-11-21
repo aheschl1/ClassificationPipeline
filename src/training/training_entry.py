@@ -237,7 +237,9 @@ class Trainer:
             transforms.RandomAdjustSharpness(1.5),
             transforms.RandomVerticalFlip(p=0.25, ),
             transforms.RandomHorizontalFlip(p=0.25, ),
-            transforms.GaussianBlur(3),
+            transforms.RandomApply([
+                transforms.Lambda(lambd=lambda x: x+torch.randn(*x.shape, device=x.device)),
+            ])
         ])
         val_transforms = transforms.Compose([
             Resize(self.config.get('target_size', [512, 512]), antialias=True),

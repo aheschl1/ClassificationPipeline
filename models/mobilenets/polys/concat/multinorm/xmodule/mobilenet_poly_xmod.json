@@ -1,0 +1,52 @@
+{
+    "LogKwargs": {
+        "backbone": "Mobilenetv2",
+        "conv": "Poly with X[3]",
+        "order": "1, 2, 3",
+        "mode": "concat multinorm"
+    },
+    "Tag": "mobilenet-v2",
+    "Children": [
+        {
+            "ComponentClass": "mobilenetv2",
+            "args": {
+                "conv": "Poly",
+                "norm_op": "MultiBatchNorm",
+                "conv_args": {
+                    "order": [
+                        1, 2, 3
+                    ],
+                    "poly_mode": "concat",
+                    "conv_op": "XModule",
+                    "conv_args": {
+                        "kernel_sizes": [
+                            3
+                        ]
+                    }
+                }
+            }
+        },
+        {
+            "ComponentClass":"ReLU",
+            "args":{}
+        },
+        {
+            "ComponentClass": "Linear",
+            "args": {
+                "in_features": 1000,
+                "out_features": 256
+            }
+        },
+        {
+            "ComponentClass":"ReLU",
+            "args":{}
+        },
+        {
+            "ComponentClass": "Linear",
+            "args": {
+                "in_features": 256,
+                "out_features": 7
+            }
+        }
+    ]
+}

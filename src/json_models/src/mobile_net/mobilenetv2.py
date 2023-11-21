@@ -99,6 +99,7 @@ class MobileNetV2(nn.Module):
         elif conv == 'MultiRoute':
             conv_op = MultiRoute
         
+        assert norm_op in ["MultiBatchNorm", "BatchNorm2d"]
         if norm_op=="BatchNorm2d":
             norm_op=nn.BatchNorm2d
         else:

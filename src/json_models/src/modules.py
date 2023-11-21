@@ -457,7 +457,6 @@ class XModule(nn.Module):
             self.branches.append(branch)
 
         self.pw = nn.Sequential(
-            nn.ReLU(),
             nn.BatchNorm2d(num_features=in_channels * len(kernel_sizes)),
             nn.Conv2d(in_channels=in_channels * len(kernel_sizes), out_channels=out_channels, kernel_size=1)
         )
@@ -787,21 +786,34 @@ class PolyWrapper(nn.Module):
         if conv_args is None:
             conv_args = {}
         assert len(order) > 0, "Order must be a list of exponents with length > 0."
-        assert poly_mode in ['sum', 'sumv2']
+        assert poly_mode in ['sum', 'sumv2', 'concat']
+        self.mode = poly_mode
         conv_op = my_import(conv_op)
-        poly_block = PolyBlock if poly_mode == 'sum' else PolyBlockV2
+        poly_block = PolyBlock if poly_mode in ['sum', 'concat'] else PolyBlockV2
         self.branches = nn.ModuleList([
-            poly_block(in_channels, out_channels, o, stride, conv_op=conv_op, **conv_args) for o in order
+            poly_block(in_channels, 
+                       out_channels if self.mode in ['sum', 'sumv2'] else in_channels, o, stride, conv_op=conv_op, **conv_args) for o in order
         ])
+        if self.mode == "concat":
+            self.pointwise = nn.Conv2d(in_channels*len(order), out_channels, kernel_size=1)
 
     def forward(self, x):
         out = None
         for mod in self.branches:
             if out is None:
                 out = mod(x)
+                if self.mode == "concat":
+                    out = [out]
             else:
-                out = torch.add(out, mod(x))
-        return out
+                if self.mode in ["sum", "sumv2"]:
+                    out = torch.add(out, mod(x))
+                elif self.mode == "concat":
+                    out.append(mod(x))
+        if self.mode in ["sum", "sumv2"]:
+            return out
+        out = torch.concat(out, dim=1)
+        return self.pointwise(out)
+        
 
 
 class MultiRoute(nn.Module):
