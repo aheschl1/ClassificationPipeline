@@ -26,6 +26,7 @@ from src.utils.utils import get_dataset_name_from_id, read_json, get_dataloaders
     get_preprocessed_datapoints
 from src.json_models.src.model_generator import ModelGenerator
 from src.json_models.src.modules import ModuleStateController
+from src.json_models.src.utils import my_import
 import torch.multiprocessing as mp
 from torch.utils.data.distributed import DistributedSampler
 from torch.nn.parallel import DistributedDataParallel as DDP
@@ -416,9 +417,12 @@ class Trainer:
         :param path: The path to the json architecture definition.
         :return: The pytorch network module.
         """
-        shutil.copy(path, f"{self.output_dir}")
-        gen = ModelGenerator(json_path=path)
-        model = gen.get_model().to(self.device)
+        if 'json' not in path:
+            model = my_import(path)
+        else:
+            shutil.copy(path, f"{self.output_dir}")
+            gen = ModelGenerator(json_path=path)
+            model = gen.get_model().to(self.device)
         if self.device == 0:
             log('Model log args: ')
             log(gen.get_log_kwargs())
