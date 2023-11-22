@@ -1,5 +1,4 @@
-import math
-from typing import List, Dict
+
 
 from einops.layers.torch import Reduce
 from src.json_models.src.model_builder import ModelBuilder
@@ -910,7 +909,9 @@ class MultiBatchNorm(nn.Module):
 
         self.adaptive_avg = nn.AdaptiveAvgPool2d(1)
         self.linear = nn.Sequential(
-            nn.Linear(num_features, 3),
+            nn.Linear(num_features, 12),
+            nn.ReLU(),
+            nn.Linear(12, 3),
             nn.Sigmoid()
         )
 
