@@ -12,7 +12,7 @@
             "args": {
                 "conv": "DW",
                 "conv_args":{},
-                "norm_op":"multi"
+                "norm_op":"MultiBatchNorm"
             }
         },
         {
