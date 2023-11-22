@@ -917,14 +917,18 @@ class MultiBatchNorm(nn.Module):
         )
 
     def _train_forward(self, x):
-        x_b = self.adaptive_avg(x).squeeze(dim=(2, 3))
-        x_b = self.linear(x_b)
+        # x_b = self.adaptive_avg(x).squeeze(dim=(2, 3))
+        # x_b = self.linear(x_b)
+        # done here, doesn't seem to converge well
 
         mean = torch.mean(x, dim=(0, 2, 3), keepdim=True)
         var = ((x-mean)**2).mean(dim=(0, 2, 3), keepdim=True)
         std = torch.sqrt(var+1e-7)
         x = (x - mean) / std
         # calculate
+        x_b = self.adaptive_avg(x).squeeze(dim=(2, 3))
+        x_b = self.linear(x_b)
+        # calculated here, seems to do fine
         # do da shift
         x = x_b[:, 0:1].unsqueeze(2).unsqueeze(3)*(self.y * x + self.b) + x_b[:, 1:2].unsqueeze(2).unsqueeze(3)*(self.y2 * x + self.b2) + x_b[:, 2:].unsqueeze(2).unsqueeze(3)*(self.y3 * x + self.b3)
         # update stats

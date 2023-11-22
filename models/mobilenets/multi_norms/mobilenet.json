@@ -3,7 +3,7 @@
         "backbone": "Mobilenetv2",
         "conv": "DW",
         "order": "NA",
-        "mode": "MultiNorm"
+        "mode": "MultiNorm V2"
     },
     "Tag": "mobilenet-v2",
     "Children": [
