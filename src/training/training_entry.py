@@ -6,7 +6,7 @@ sys.path.append("/home/andrew.heschl/Documents/ClassificationPipeline")
 sys.path.append("/home/andrewheschl/PycharmProjects/classification_pipeline")
 sys.path.append("/home/student/andrew/Documents/ClassificationPipeline")
 sys.path.append('/home/tapotosh.ghosh/ClassificationPipeline')
-
+sys.path.append('/home/tapotosh.ghosh/classification/newClassification/ClassificationPipeline')
 sys.path.append("/home/student/andrewheschl/Documents/ClassificationPipeline")
 import logging
 import os.path
@@ -22,8 +22,7 @@ from torch.utils.data import DataLoader
 import shutil
 from sklearn.metrics import confusion_matrix
 from src.utils.constants import *
-from src.utils.utils import get_dataset_name_from_id, read_json, get_dataloaders_from_fold, get_config_from_dataset, \
-    get_preprocessed_datapoints
+from src.utils.utils import get_dataset_name_from_id, read_json, get_dataloaders_from_fold, get_config_from_dataset, get_preprocessed_datapoints
 from src.json_models.src.model_generator import ModelGenerator
 from src.json_models.src.modules import ModuleStateController
 from src.json_models.src.utils import my_import
@@ -143,8 +142,8 @@ class Trainer:
         self.save_latest = save_latest
         self.device = gpu_id
         self.softmax = nn.Softmax(dim=1)
-        self.output_dir = self._prepare_output_directory(unique_folder_name)
         class_names = read_json(f"{PREPROCESSED_ROOT}/{self.dataset_name}/id_to_label.json")
+        self.output_dir = self._prepare_output_directory(unique_folder_name)
         self.log_helper = LogHelper(self.output_dir, class_names)
         self._assert_preprocess_ready_for_train()
         self.config = get_config_from_dataset(dataset_name, config_name)
