@@ -32,8 +32,18 @@ class ConvBlockv2(nn.Module):
             conv_op = PXModule
         elif conv == 'MultiRoute':
             conv_op = MultiRoute
-
-        self.conv = conv_op(in_channels, out_chanels, stride =1  **conv_args)
+        #print(conv_args['order'],conv_op)
+        if conv_args==None:
+            conv_args=dict()
+        conv_args.update(kwargs)
+        if conv=='Conv':
+            self.conv = conv_op(in_channels, out_chanels,**kwargs)
+        elif conv=='XModule':
+            kernel_sizes = [kwargs['kernel_size']]
+            print(kernel_sizes)
+            self.conv = conv_op(in_channels, out_chanels, kernel_sizes=kernel_sizes)
+        else:
+            self.conv = conv_op(in_channels, out_chanels, **conv_args)
         self.bn = nn.BatchNorm2d(out_chanels)
         
     def forward(self, x):
@@ -54,14 +64,15 @@ class InceptionBlock(nn.Module):
     ):
         super(InceptionBlock, self).__init__()
         self.conv = conv
+        #print(conv)
         self.branch1 = ConvBlock(in_channels, out_1x1, kernel_size=1)
         self.branch2 = nn.Sequential(
             ConvBlock(in_channels, red_3x3, kernel_size=1, padding=0),
-            ConvBlockv2(red_3x3, out_3x3, kernel_size=3, padding=1, conv = "Conv",conv_args=conv_args),
+            ConvBlockv2(red_3x3, out_3x3, kernel_size=3, padding=1, conv = conv, conv_args=conv_args),
         )
         self.branch3 = nn.Sequential(
             ConvBlock(in_channels, red_5x5, kernel_size=1),
-            ConvBlockv2(red_5x5, out_5x5, kernel_size=5, padding=2, conv = "Conv",conv_args=conv_args),
+            ConvBlockv2(red_5x5, out_5x5, kernel_size=5, padding=2, conv = conv,conv_args=conv_args),
         )
         self.branch4 = nn.Sequential(
             nn.MaxPool2d(kernel_size=3, padding=1, stride=1),
@@ -74,9 +85,10 @@ class InceptionBlock(nn.Module):
 
 
 class InceptionV1(nn.Module):
-    def __init__(self, aux_logits=False, num_classes=1000, conv= 'conv', conv_args = None):
+    def __init__(self, aux_logits=False, num_classes=1000, conv='conv', conv_args = None):
         super(InceptionV1, self).__init__()
         assert conv in ['DW', 'Conv', 'Poly', 'XModule', 'PXModule', 'MultiRoute']
+
         if conv_args is None:
             self.conv_args = {}
         self.aux_logits = aux_logits
@@ -106,29 +118,29 @@ class InceptionV1(nn.Module):
         
 
 
-def forward(self, x):
-    x = self.conv1(x)
-    x = self.maxpool(x)
-    x = self.conv2(x)
-    x = self.maxpool(x)
-    x = self.inception3a(x)
-    x = self.inception3b(x)
-    x = self.maxpool(x)
-    x = self.inception4a(x)
-    
-    
-    
-    x = self.inception4b(x)
-    x = self.inception4c(x)
-    x = self.inception4d(x)
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.maxpool(x)
+        x = self.conv2(x)
+        x = self.maxpool(x)
+        x = self.inception3a(x)
+        x = self.inception3b(x)
+        x = self.maxpool(x)
+        x = self.inception4a(x)
+        
+        
+        
+        x = self.inception4b(x)
+        x = self.inception4c(x)
+        x = self.inception4d(x)
 
-    
-    x = self.inception4e(x)
-    x = self.maxpool(x)
-    x = self.inception5a(x)
-    x = self.inception5b(x)
-    x = self.avgpool(x)
-    x = x.reshape(x.shape[0], -1)
-    x = self.dropout(x)
-    x = self.fc(x)
-    return x
+        
+        x = self.inception4e(x)
+        x = self.maxpool(x)
+        x = self.inception5a(x)
+        x = self.inception5b(x)
+        x = self.avgpool(x)
+        x = x.reshape(x.shape[0], -1)
+        x = self.dropout(x)
+        x = self.fc(x)
+        return x
