@@ -29,6 +29,10 @@ def my_import(class_name: str, dropout_package: str = 'torch.nn'):
         return models.efficientnet_b0
     elif class_name == ENB1_P:
         return models.efficientnet_b1
+    
+    if class_name == "inception":
+        from src.json_models.src.inceptionNet.inceptionNet import InceptionV1
+        return InceptionV1
 
     if class_name == ENB0:
         from src.json_models.src.efficientnet.efficientnet import EfficientNetB0

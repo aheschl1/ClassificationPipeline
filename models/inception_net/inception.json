@@ -1,0 +1,28 @@
+{
+    "LogKwargs": {
+        "backbone": "InceptionNet",
+        "order": "NA",
+        "mode": "BAseline"
+    },
+    "Tag": "mobilenet-v2",
+    "Children": [
+        {
+            "ComponentClass": "inception",
+            "args": {
+                "conv": "Conv",
+                "conv_args":{}
+            }
+        },
+        {
+            "ComponentClass":"ReLU",
+            "args":{}
+        },
+        {
+            "ComponentClass": "Linear",
+            "args": {
+                "in_features": 1000,
+                "out_features": 102
+            }
+        }
+    ]
+}
