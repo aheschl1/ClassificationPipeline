@@ -1,13 +1,4 @@
 import glob
-import sys
-
-# Adds the source to path for imports and stuff
-sys.path.append("/home/andrew.heschl/Documents/ClassificationPipeline")
-sys.path.append("/home/andrewheschl/PycharmProjects/classification_pipeline")
-sys.path.append("/home/student/andrew/Documents/ClassificationPipeline")
-sys.path.append('/home/tapotosh.ghosh/ClassificationPipeline')
-sys.path.append('/home/tapotosh.ghosh/classification/newClassification/ClassificationPipeline')
-sys.path.append("/home/student/andrewheschl/Documents/ClassificationPipeline")
 import logging
 import os.path
 import time

@@ -1,9 +1,4 @@
-import sys
 from typing import List
-sys.path.append("/home/student/andrewheschl/Documents/ClassificationPipeline")
-sys.path.append("/home/andrew.heschl/Documents/ClassificationPipeline")
-sys.path.append("/home/student/andrew/Documents/ClassificationPipeline")
-sys.path.append("/home/andrewheschl/PycharmProjects/classification_pipeline")
 import click
 from src.utils.constants import *
 from src.utils.utils import get_dataset_name_from_id
@@ -15,7 +10,7 @@ import pandas as pd
 class Analysis:
     def __init__(self, folders, output_root: str):
         """
-        Given a list of folders (expected to be folders inside of a fold folder in result root),
+        Given a list of folders (expected to be folders inside a fold folder in result root),
         controls the analysis of logs.
         """
         self.output_root = output_root

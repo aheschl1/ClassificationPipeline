@@ -11,7 +11,7 @@ For segmentation, mask and image must be same filetype.
 
 # Getting started
 To start, you must:
-1. On src/training/training_entry.py and src/preprocessing/preprocess_entry.py add the line: sys.path.append('/my/path/to/ClassificationPipeline')
+1. Run pip install -e . from the classification_pipeline folder (right above src)
 2. Add RAW_ROOT, RESULTS_ROOT, and PREPROCESSED_ROOT to your environent variables (in ~/.bashrc for example).
 3. Run python training_entry.py --help for available option
 4. Run python preprocess_entry.py --help for available options

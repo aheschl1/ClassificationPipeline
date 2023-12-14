@@ -1,0 +1,3 @@
+torchvision
+simpleitk
+click
