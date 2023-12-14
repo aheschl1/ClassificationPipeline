@@ -416,6 +416,7 @@ class Trainer:
         :param path: The path to the json architecture definition.
         :return: The pytorch network module.
         """
+        gen = None
         if 'json' not in path:
             model = my_import(path)
         else:
@@ -423,16 +424,21 @@ class Trainer:
             gen = ModelGenerator(json_path=path)
             model = gen.get_model().to(self.device)
         if self.device == 0:
-            log('Model log args: ')
-            log(gen.get_log_kwargs())
+            if gen is not None:
+                log('Model log args: ')
+                log(gen.get_log_kwargs())
+            else:
+                log(f"Loaded model {path}")
             self.log_helper.log_net_structure(model, self.train_transforms(
                 torch.randn(1, *self.data_shape, device=torch.device(self.device))
             ))
             all_params = sum(param.numel() for param in model.parameters())
             trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-            log(f"Total paramaters: {all_params}")
+            log(f"Total parameters: {all_params}")
             log(f"Trainable params: {trainable_params}")
             self.log_helper.log_parameters(all_params, trainable_params)
+        if self.world_size > 1:
+            model = nn.SyncBatchNorm.convert_sync_batchnorm(model)
         return model
 
     def _load_checkpoint(self, weights_name) -> None:
